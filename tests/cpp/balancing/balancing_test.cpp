@@ -186,11 +186,34 @@ protected:
         logger->display_message("Test of findAreaClusterToModify done!");
     }
 
+    void assertCandidateBounds(std::shared_ptr<ProblemManager> problemManager,
+                               std::vector<int> candidateIndices,
+                               double expectedUpperBound,
+                               double expectedLowerBound)
+    {
+        double upperBound;
+        double lowerBound;
+        for (const auto& pbId: problemManager->getProblemIds())
+        {
+            std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
+            for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+            {
+                problem->get_ub(&upperBound, candidateIndices[hour], candidateIndices[hour]);
+                EXPECT_TRUE(upperBound == expectedUpperBound);
+                problem->get_lb(&lowerBound, candidateIndices[hour], candidateIndices[hour]);
+                EXPECT_TRUE(lowerBound == expectedLowerBound);
+            }
+        }
+    }
+
     void testApplyActionToCluster(const std::string& areaName,
                                   const std::string& candidateName,
                                   const CapacityAction& action,
-                                  const double investedCapacityIncrement,
-                                  const double expectedInvestedCapacity)
+                                  const double capacityIncrement,
+                                  const double boundGap,
+                                  const CandidateBoundType boundType,
+                                  const double expectedUpperCapacity,
+                                  const double expectedLowerCapacity)
     {
         // copy study data
         copyStudyData("with_decom_candidate");
@@ -210,37 +233,60 @@ protected:
                                                                           logger,
                                                                           problemManager,
                                                                           iterLogFilePath);
+
         // set pbg.areaSettings
         double newBoundRef;
+        int multForUpperBoundLocation;
+        pbg.areasSettings[areaName].currentInvestmentIncrement = capacityIncrement;
         if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
         {
-            pbg.areasSettings[areaName].currentInvestmentIncrement = investedCapacityIncrement;
             pbg.areasSettings[areaName].investmentCandidates[candidateName].initialCapacity
-              -= 2 * investedCapacityIncrement; // we set initialCapacity lower to
-                                                // allow disinvestment
+              = 4 * capacityIncrement; // we set initialCapacity lower to allowed disinvestment
+            pbg.areasSettings[areaName].currentInvestmentIncrement = capacityIncrement;
+            pbg.areasSettings[areaName].investmentCandidates[candidateName].boundGap = boundGap;
+            pbg.areasSettings[areaName].investmentCandidates[candidateName].boundType = boundType;
+            multForUpperBoundLocation = 6;
         }
         else
         {
-            pbg.areasSettings[areaName].currentDecommissioningIncrement = investedCapacityIncrement;
             pbg.areasSettings[areaName].decommissioningCandidates[candidateName].initialCapacity
-              += 2 * investedCapacityIncrement; // we set initialCapacity higher to
-                                                // allow recom
+              = 4 * capacityIncrement; // we set initialCapacity higher to allowed recom
+            pbg.areasSettings[areaName].currentDecommissioningIncrement = capacityIncrement;
+            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].boundGap
+              = boundGap;
+            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].boundType
+              = boundType;
+            multForUpperBoundLocation = 2;
         }
+
+        const auto& varIndices = pbg.balancingData.at({areaName, candidateName}).dispProdVarIndices;
+        auto& areaSettings = pbg.areasSettings.at(areaName);
+        std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
+        double upperBoundSet = multForUpperBoundLocation * capacityIncrement;
+        double lowerBoundSet = boundType == CandidateBoundType::UPPERONLY
+                                 ? 0.0
+                                 : multForUpperBoundLocation * capacityIncrement - boundGap;
+        std::vector<double> upperValues(NUMBER_OF_HOURS_PER_WEEK, upperBoundSet);
+        std::vector<double> lowerValues(NUMBER_OF_HOURS_PER_WEEK, lowerBoundSet);
+        std::vector<char> boundU(NUMBER_OF_HOURS_PER_WEEK, 'U');
+        std::vector<char> boundL(NUMBER_OF_HOURS_PER_WEEK, 'L');
+
+        for (const auto& pbId: problemManager->getProblemIds())
+        {
+            std::shared_ptr<Problem> problem = pbg.problemManager->getProblemFromId(pbId);
+            problem->chg_bounds(vecIndices, boundU, upperValues);
+            problem->chg_bounds(vecIndices, boundL, lowerValues);
+        }
+        // assert bounds before action
+        assertCandidateBounds(pbg.problemManager, vecIndices, upperBoundSet, lowerBoundSet);
         // run applyActionToCluster
         pbg.applyActionToCluster({areaName, candidateName}, action);
         // assert results
         // we check that new bound of candidate have been correctly set
-        const auto& varIndices = pbg.balancingData.at({areaName, candidateName}).dispProdVarIndices;
-        double newBound;
-        for (const auto& pbId: problemManager->getProblemIds())
-        {
-            std::shared_ptr<Problem> problem = pbg.problemManager->getProblemFromId(pbId);
-            for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
-            {
-                problem->get_ub(&newBound, varIndices[hour], varIndices[hour]);
-                EXPECT_TRUE(newBound == expectedInvestedCapacity);
-            }
-        }
+        assertCandidateBounds(pbg.problemManager,
+                              vecIndices,
+                              expectedUpperCapacity,
+                              expectedLowerCapacity);
     }
 
     void testComputeRentabilityForCandidates(const double hourlySolutionValue,
@@ -256,7 +302,6 @@ protected:
         std::string areaName = "area2";
         std::string candidateName = action == CapacityAction::INVESTMENT ? "invest_peak2"
                                                                          : "unprofitable_peak";
-
         // copy dummy data
         copyStudyData(studyName);
 
@@ -269,18 +314,17 @@ protected:
                                                       / "iterations_values_log.csv";
         const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
         // instantiation of ProblemGenerationForBalancing
-        BalancingParser dummyBalParser(inputBalFilePath);
+        BalancingParser balParser(inputBalFilePath);
         auto problemManager = std::make_shared<ProblemManager>("xpress",
                                                                "mps",
                                                                false,
                                                                true,
                                                                "initial_problems");
-        ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(
-          directories,
-          dummyBalParser.areaSettings,
-          logger,
-          problemManager,
-          iterLogFilePath);
+        ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(directories,
+                                                                          balParser.areaSettings,
+                                                                          logger,
+                                                                          problemManager,
+                                                                          iterLogFilePath);
 
         // set test data
         // set investment cost and fixed om cost
@@ -481,26 +525,89 @@ TEST_F(BalancingTest, findAreaClustersToModify)
     testFindAreaClustersToModify();
 }
 
-TEST_F(BalancingTest, applyActionToCluster)
+TEST_F(BalancingTest, applyInvestmentActionToClusterWithUpperonlyBound)
 {
-    logger->display_message("Testing of applyActionToCluster");
-    // test with INVESTMENT action
-    testApplyActionToCluster("area2", "invest_semibase", CapacityAction::INVESTMENT, 1000, 3800);
-    // test with DISINVESTMENT action
-    testApplyActionToCluster("area2", "invest_semibase", CapacityAction::DISINVESTMENT, 1000, 1800);
-    // test with DECOM action
+    logger->display_message("Testing of applyActionToCluster with INVESTMENT and UpperOnly bound");
+    testApplyActionToCluster("area2",
+                             "invest_semibase",
+                             CapacityAction::INVESTMENT,
+                             500,
+                             0.0,
+                             CandidateBoundType::UPPERONLY,
+                             3500,
+                             0.0);
+    logger->display_message(
+      "Test of applyActionToCluster with INVESTMENT and UpperOnly bound done!");
+}
+
+TEST_F(BalancingTest, applyInvestmentActionToClusterWithBothBound)
+{
+    logger->display_message("Testing of applyActionToCluster with INVESTMENT and Both bound");
+    testApplyActionToCluster("area2",
+                             "invest_semibase",
+                             CapacityAction::INVESTMENT,
+                             500,
+                             200,
+                             CandidateBoundType::BOTH,
+                             3500,
+                             3300);
+    logger->display_message("Test of applyActionToCluster with INVESTMENT and Both bound done!");
+}
+
+TEST_F(BalancingTest, applyInvestmentActionToClusterWithFixedBound)
+{
+    logger->display_message("Testing of applyActionToCluster with INVESTMENT and Fixed bound");
+    testApplyActionToCluster("area2",
+                             "invest_semibase",
+                             CapacityAction::INVESTMENT,
+                             500,
+                             0.0,
+                             CandidateBoundType::FIXED,
+                             3500,
+                             3500);
+    logger->display_message("Test of applyActionToCluster with INVESTMENT and Fixed bound done!");
+}
+
+TEST_F(BalancingTest, applyDisinvestmentActionToCluster)
+{
+    logger->display_message("Testing of applyActionToCluster with DISINVESTMENT");
+    testApplyActionToCluster("area2",
+                             "invest_semibase",
+                             CapacityAction::DISINVESTMENT,
+                             500,
+                             200,
+                             CandidateBoundType::BOTH,
+                             2500,
+                             2300);
+    logger->display_message("Test of applyActionToCluster with DISINVESTMENT done!");
+}
+
+TEST_F(BalancingTest, applyDecomActionToCluster)
+{
+    logger->display_message("Testing of applyActionToCluster with DECOM");
     testApplyActionToCluster("area2",
                              "unprofitable_peak",
                              CapacityAction::DECOMMISSIONING,
-                             1000,
-                             4000);
-    // test with RECOM action
+                             500,
+                             200,
+                             CandidateBoundType::BOTH,
+                             500,
+                             300);
+    logger->display_message("Test of applyActionToCluster with DECOM done!");
+}
+
+TEST_F(BalancingTest, applyRecomActionToCluster)
+{
+    logger->display_message("Testing of applyActionToCluster with RECOM");
     testApplyActionToCluster("area2",
                              "unprofitable_peak",
                              CapacityAction::RECOMMISSIONING,
-                             1000,
-                             6000);
-    logger->display_message("Test of applyActionToCluster done!");
+                             500,
+                             200,
+                             CandidateBoundType::BOTH,
+                             1500,
+                             1300);
+    logger->display_message("Test of applyActionToCluster with RECOM done!");
 }
 
 TEST_F(BalancingTest, computeNonNullRentabilityForCandidates)
