@@ -13,6 +13,13 @@ enum class CriterionState
     UNINITIALIZED,
 };
 
+enum class CandidateBoundType
+{
+    UPPERONLY,
+    FIXED,
+    BOTH,
+};
+
 constexpr std::string_view to_string(CriterionState state)
 {
     switch (state)
@@ -50,6 +57,8 @@ struct Candidate
     double currentCapacity;
     double previousCapacity;
     double initialCapacity;
+    double boundGap;
+    CandidateBoundType boundType;
 };
 
 struct AreaSettings

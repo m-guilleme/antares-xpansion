@@ -74,12 +74,22 @@ void ProblemGenerationForBalancing::getInitialCapacitiesForCandidates()
       [&](const std::string& areaName, const std::string& clusterName, auto& candidate)
     {
         const AreaCluster key{areaName, clusterName};
+        double upperBound;
+        double lowerBound;
         const auto& dispProdVarIndices = balancingData[key].dispProdVarIndices;
-        problemManager->getFirstProblem()->get_ub(&candidate.currentCapacity,
+        problemManager->getFirstProblem()->get_ub(&upperBound,
                                                   dispProdVarIndices[0],
                                                   dispProdVarIndices[0]);
-        candidate.initialCapacity = candidate.currentCapacity;
-        candidate.previousCapacity = candidate.initialCapacity;
+        problemManager->getFirstProblem()->get_lb(&lowerBound,
+                                                  dispProdVarIndices[0],
+                                                  dispProdVarIndices[0]);
+        candidate.boundType = upperBound == lowerBound ? CandidateBoundType::FIXED
+                              : lowerBound > 0.0       ? CandidateBoundType::BOTH
+                                                       : CandidateBoundType::UPPERONLY;
+        candidate.boundGap = lowerBound > 0.0 ? upperBound - lowerBound : 0.0;
+        candidate.currentCapacity = upperBound;
+        candidate.initialCapacity = upperBound;
+        candidate.previousCapacity = upperBound;
     };
 
     for (auto& [areaName, areaSetting]: areasSettings)
@@ -733,18 +743,6 @@ double ProblemGenerationForBalancing::computeNewBoundAndUpdateCandidate(
     return newBound;
 }
 
-static char boundTypeForAction(CapacityAction action)
-{
-    switch (action)
-    {
-    case CapacityAction::INVESTMENT:
-    case CapacityAction::DISINVESTMENT:
-    case CapacityAction::DECOMMISSIONING:
-    case CapacityAction::RECOMMISSIONING:
-        return 'U';
-    }
-}
-
 /// @brief Apply the action for each area cluster to the problems
 /// @param areaCluster The area cluster to apply the action to
 /// @param action The action to apply
@@ -754,10 +752,25 @@ void ProblemGenerationForBalancing::applyActionToCluster(const AreaCluster& area
     lastActionForArea[areaCluster.first] = action;
     const auto& varIndices = balancingData.at(areaCluster).dispProdVarIndices;
     auto& areaSettings = areasSettings.at(areaCluster.first);
-    const char boundType = boundTypeForAction(action);
-
     std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
-    std::vector<char> boundTypes(NUMBER_OF_HOURS_PER_WEEK, boundType);
+
+    double boundGap;
+    CandidateBoundType boundType;
+    switch (action)
+    {
+    case CapacityAction::INVESTMENT:
+    case CapacityAction::DISINVESTMENT:
+        boundGap = areaSettings.investmentCandidates.at(areaCluster.second).boundGap;
+        boundType = areaSettings.investmentCandidates.at(areaCluster.second).boundType;
+        break;
+    case CapacityAction::DECOMMISSIONING:
+    case CapacityAction::RECOMMISSIONING:
+        boundGap = areaSettings.decommissioningCandidates.at(areaCluster.second).boundGap;
+        boundType = areaSettings.decommissioningCandidates.at(areaCluster.second).boundType;
+        break;
+    }
+    std::vector<char> boundU(NUMBER_OF_HOURS_PER_WEEK,
+                             boundType == CandidateBoundType::FIXED ? 'B' : 'U');
 
     tbb::parallel_for_each(
       problemManager->getProblemIds(),
@@ -773,9 +786,42 @@ void ProblemGenerationForBalancing::applyActionToCluster(const AreaCluster& area
                                                                        areaSettings,
                                                                        areaCluster.second);
           }
-          problem->chg_bounds(vecIndices, boundTypes, localVarValues);
+          problem->chg_bounds(vecIndices, boundU, localVarValues);
+          if (boundType == CandidateBoundType::BOTH)
+          {
+              std::vector<char> boundL(NUMBER_OF_HOURS_PER_WEEK, 'L');
+              std::transform(localVarValues.begin(),
+                             localVarValues.end(),
+                             localVarValues.begin(),
+                             [boundGap](double x)
+                             { return x - boundGap > 0.0 ? x - boundGap : 0.0; });
+              problem->chg_bounds(vecIndices, boundL, localVarValues);
+          }
           problemManager->setProblem(pbId, problem);
       });
+}
+
+static double getCandidateCurrentCapacity(const std::map<std::string, AreaSettings>& areasSettings,
+                                          const CapacityAction& action,
+                                          const AreaCluster& areaCluster)
+{
+    double candidateCurrentCapacity;
+    switch (action)
+    {
+    case CapacityAction::INVESTMENT:
+    case CapacityAction::DISINVESTMENT:
+        candidateCurrentCapacity = areasSettings.at(areaCluster.first)
+                                     .investmentCandidates.at(areaCluster.second)
+                                     .currentCapacity;
+        break;
+    case CapacityAction::DECOMMISSIONING:
+    case CapacityAction::RECOMMISSIONING:
+        candidateCurrentCapacity = areasSettings.at(areaCluster.first)
+                                     .decommissioningCandidates.at(areaCluster.second)
+                                     .currentCapacity;
+        break;
+    }
+    return candidateCurrentCapacity;
 }
 
 /// @brief Update the problems using the balancing algorithm
@@ -815,33 +861,23 @@ std::shared_ptr<ProblemManager> ProblemGenerationForBalancing::updateProblems(
     }
     for (const auto& [areaCluster, action]: areaClusterToModify)
     {
-        const double* candidateCapacity;
-        switch (action)
-        {
-        case CapacityAction::INVESTMENT:
-        case CapacityAction::DISINVESTMENT:
-            candidateCapacity = &areasSettings.at(areaCluster.first)
-                                   .investmentCandidates.at(areaCluster.second)
-                                   .currentCapacity;
-            break;
-        case CapacityAction::DECOMMISSIONING:
-        case CapacityAction::RECOMMISSIONING:
-            candidateCapacity = &areasSettings.at(areaCluster.first)
-                                   .decommissioningCandidates.at(areaCluster.second)
-                                   .currentCapacity;
-            break;
-        }
-        double previousCandidateCapacity = *candidateCapacity;
+        double previousCandidateCapacity = getCandidateCurrentCapacity(areasSettings,
+                                                                       action,
+                                                                       areaCluster);
         applyActionToCluster(areaCluster, action);
         updateRecords(areaCluster, action);
+        double newCandidateCapacity = getCandidateCurrentCapacity(areasSettings,
+                                                                  action,
+                                                                  areaCluster);
         logger->display_message((std::stringstream()
                                  << " Area: " << areaCluster.first << " criteria: "
                                  << currentAreaCriteriaData[areaCluster.first].first << " ["
                                  << lowerThreshold(areasSettings.at(areaCluster.first)) << "-"
                                  << higherThreshold(areasSettings.at(areaCluster.first)) << "]"
-                                 << " action: " << to_string(action) << " cluster: "
-                                 << areaCluster.second << " new capacity: " << *candidateCapacity
-                                 << " delta: " << (*candidateCapacity - previousCandidateCapacity))
+                                 << " action: " << to_string(action)
+                                 << " cluster: " << areaCluster.second
+                                 << " new capacity: " << newCandidateCapacity << " delta: "
+                                 << (newCandidateCapacity - previousCandidateCapacity))
                                   .str(),
                                 LogUtils::LOGLEVEL::INFO,
                                 PROBLEM_GENERATION_LOGGER_CONTEXT);
