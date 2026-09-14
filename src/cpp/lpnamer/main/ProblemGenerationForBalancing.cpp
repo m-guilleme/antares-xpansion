@@ -83,9 +83,11 @@ void ProblemGenerationForBalancing::getInitialCapacitiesForCandidates()
         problemManager->getFirstProblem()->get_lb(&lowerBound,
                                                   dispProdVarIndices[0],
                                                   dispProdVarIndices[0]);
-        candidate.boundType = upperBound == lowerBound ? CandidateBoundType::FIXED
-                              : lowerBound > 0.0       ? CandidateBoundType::BOTH
-                                                       : CandidateBoundType::UPPERONLY;
+        // if both bound are equal to 0.0 we set as upperonly
+        candidate.boundType = upperBound == lowerBound && upperBound != 0.0
+                                ? CandidateBoundType::FIXED
+                              : lowerBound > 0.0 ? CandidateBoundType::BOTH
+                                                 : CandidateBoundType::UPPERONLY;
         candidate.boundGap = lowerBound > 0.0 ? upperBound - lowerBound : 0.0;
         candidate.currentCapacity = upperBound;
         candidate.initialCapacity = upperBound;
