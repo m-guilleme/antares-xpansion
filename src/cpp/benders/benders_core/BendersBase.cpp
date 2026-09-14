@@ -1557,7 +1557,7 @@ void BendersBase::SetBilevelBestub(double bilevel_best_ub)
 void BendersBase::setCriterionComputationInputs(
   const Benders::Criterion::CriterionInputData& criterion_input_data)
 {
-    criterion_computation_ = Benders::Criterion::CriterionComputation(criterion_input_data);
+    criterion_computation_ = Benders::Criterion::CriterionLOL(criterion_input_data);
 }
 
 /*!

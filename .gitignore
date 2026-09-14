@@ -53,6 +53,7 @@ coverage-reports
 # vscode
 .vscode
 .cache
+.clangd
 
 # Local env
 .venv
@@ -61,3 +62,6 @@ CMakeUserPresets.json
 
 # Jupyter cache
 .cache
+
+# Zone.Identifier files from Windows to WSL
+*:Zone.Identifier

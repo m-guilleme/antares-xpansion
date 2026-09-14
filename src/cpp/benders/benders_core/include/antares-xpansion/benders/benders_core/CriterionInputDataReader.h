@@ -8,7 +8,23 @@
 
 namespace Benders::Criterion
 {
-static constexpr const char* const UnsuppliedEnergy = "UnsuppliedEnergy::";
+enum class Type
+{
+    UnsuppliedEnergy,
+    NearPriceCapHours,
+};
+
+constexpr std::string_view getPrefix(Type t)
+{
+    switch (t)
+    {
+    case Type::UnsuppliedEnergy:
+        return "UnsuppliedEnergy::";
+    case Type::NearPriceCapHours:
+        return "AreaBalance::";
+    }
+    return "";
+}
 
 class CriterionInputFileError: public LogUtils::XpansionError<std::runtime_error>
 {
@@ -44,13 +60,13 @@ class CouldNotReadCriterionField: public LogUtils::XpansionError<std::runtime_er
 class CriterionPattern
 {
 public:
-    explicit CriterionPattern(std::string prefix, std::string body);
+    explicit CriterionPattern(std::string_view prefix, std::string_view body);
     CriterionPattern() = default;
     [[nodiscard]] std::string Value() const;
-    [[nodiscard]] const std::string& GetPrefix() const;
-    void SetPrefix(const std::string& prefix);
-    [[nodiscard]] const std::string& GetBody() const;
-    void SetBody(const std::string& body);
+    [[nodiscard]] std::string_view GetPrefix() const;
+    void SetPrefix(std::string_view prefix);
+    [[nodiscard]] std::string_view GetBody() const;
+    void SetBody(std::string_view body);
 
 private:
     std::string prefix_;
@@ -66,23 +82,26 @@ public:
     /// @param prefix the prefix in the variable's name
     /// @param body any string that could be in the variable's name
     /// @param criterion the criterion that should be satisfied
-    CriterionSingleInputData(const std::string& prefix, const std::string& body, double criterion);
+    CriterionSingleInputData(std::string_view prefix, std::string_view body, double criterion);
 
     [[nodiscard]] CriterionPattern Pattern() const;
     [[nodiscard]] double Criterion() const;
     void SetCriterion(double criterion);
-    void ResetPattern(const std::string& prefix, const std::string& body);
+    void ResetPattern(std::string_view prefix, std::string_view body);
 
 private:
     CriterionPattern pattern_;
-    double criterion_ = 0;
+    double criterion_{0};
 };
 
 /// @brief this class contains all data read from user input file
 class CriterionInputData
 {
 public:
-    CriterionInputData() = default;
+    CriterionInputData(const Type criterion = Type::UnsuppliedEnergy):
+        criterion(criterion)
+    {
+    }
 
     [[nodiscard]] const std::vector<CriterionSingleInputData>& Criteria() const;
 
@@ -92,6 +111,8 @@ public:
     void SetCriterionCountThreshold(double count_threshold);
     [[nodiscard]] double CriterionCountThreshold() const;
     void AddSingleData(const CriterionSingleInputData& data);
+
+    Type criterion{Type::UnsuppliedEnergy};
 
 private:
     std::vector<CriterionSingleInputData> criterion_vector_;

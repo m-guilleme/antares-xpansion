@@ -2,13 +2,10 @@
 
 #include <cstdio>
 #include <filesystem>
-#include <fstream>
 #include <map>
-#include <ostream>
+#include <optional>
 #include <tbb/task_arena.h>
 
-#include "antares-xpansion/benders/factories/LoggerFactories.h"
-#include "antares-xpansion/benders/logger/FilteredLogger.h"
 #include "antares-xpansion/xpansion_interfaces/ILogger.h"
 
 /**
@@ -24,8 +21,8 @@ public:
     /// @param logFileName the basename of all log files, which will be prefixed by the thread id
     /// @param nbThreads the number of desired threads
     /// @param verbosity the lowest verbosity desired
-    explicit MultithreadTBBLogger(std::filesystem::path logFolder,
-                                  std::filesystem::path logFileName,
+    explicit MultithreadTBBLogger(const std::filesystem::path& logFolder,
+                                  const std::string& logFileName,
                                   int nbThreads,
                                   std::optional<LogUtils::LOGLEVEL> verbosity = std::nullopt);
     ~MultithreadTBBLogger() = default;

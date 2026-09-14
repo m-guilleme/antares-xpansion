@@ -1,0 +1,90 @@
+reliability_standard_dead_band_up: 0.5
+reliability_standard_dead_band_down: 0.5
+# reliability_standard_indicator: NPCAP_HOURS # Or LOLE
+reliability_standard_indicator: LOLE # Or LOLE
+
+areas:
+  area1:
+    reliability_standard: 3.5
+    decommissioning_increment: 1000
+    investment_increment: 500
+    max_oscillation: 30
+    decommissioning_candidates_to_type:
+    investment_candidates_to_type:
+      invest_semibase1: semibase_type
+      invest_peak: peak_type
+  area2:
+    reliability_standard: 3
+    decommissioning_increment: 1000
+    investment_increment: 500
+    max_oscillation: 30
+    decommissioning_candidates_to_type:
+      unprofitable_peak: decom_type
+    investment_candidates_to_type:
+      invest_semibase: semibase_type
+      invest_peak2: peak_type
+
+decommissioning_candidates_types:
+  decom_type:
+    derating: 0.0
+    expansion_potential: 0
+    decommissioning_cost: 0
+    fixed_om_costs: 1000
+    decommissioning_potential: 0
+
+investment_candidates_types:
+  semibase_type:
+    derating: 0.0
+    expansion_potential: 4000
+    investment_cost: 126000
+    fixed_om_costs: 0
+  peak_type:
+    derating: 0.0
+    expansion_potential: 3000
+    investment_cost: 60000
+    fixed_om_costs: 0
+
+    # A mettre dans user/balancing
+
+# Limitations : Ne fonctionne en supposant que les clusters candidats à l'invest/désinvest sont constitués d'une seule unité dont on va modifier la Pmax (on ne fait de modif sur la contrainte liant Pmax d'une unité / Pmax de cluster et NbMax d'unités allumées)
+
+# Les TS de dispo sont mises dans la borne des variables dispatchableProduction :
+# - https://github.com/AntaresSimulatorTeam/Antares_Simulator/blob/01e56f4323b97ee090489b7cf79ce42eb93b9b30/src/solver/simulation/common-eco-adq.cpp#L367
+# - https://github.com/AntaresSimulatorTeam/Antares_Simulator/blob/01e56f4323b97ee090489b7cf79ce42eb93b9b30/src/solver/optimisation/opt_gestion_des_bornes_cas_lineaire.cpp#L333
+
+######## Description algo #########
+#### Initialisation ####
+## Partie entrée "métier"
+# Lecture du yaml -> Structure de données métier
+
+## Génération des problèmes Antares
+# Utilisation possible de Antares API (new !) pour récupérer les pbs (mais format MPS seulement), probablement déjà implémenté dans ProblemGeneration (voir dernière version Xpansion)
+# Stocker les couts marginaux de chaque cluster dans un vecteur/map -> coeff dans la fonction objectif des variables DispatchableProduction du cluster (besoin de regarder que l'heure 0)
+
+## Traduction entrée métier -> localisation des données à modifier dans le pb (on va modifier des bornes de variables)
+# Créer un mapping nom candidats -> ids des variables dans le pb (1 par heure et par candidat)
+# Pour un cluster my_cluster dans la zone my_area, récupérer les variables sont DispatchableProduction::area<my_area>::ThermalCluster<my_cluster>::hour<h>
+
+#### Boucle principale ###
+
+## Résolution des problèmes Antares
+
+## Récupérer les données d'intérêt de la simu
+# Pour le calcul du critère : DefaillancePositive par zone et par heure
+# Pour le calcul des revenus : Prix: Variable duale de contrainte de balance par zone et par heure AreaBalance::area<my_area>::hour<h> ->getdual(constraint_id)
+
+## Calcul du critère par zone
+
+## Choix de nouvelles capacités des candidats
+# Pour chaque zone Z où critère non vérifié :
+# Calcul de la rentabilité de chaque cluster C de la zone Z :
+#   - pour l'invest : somme(h=0..8760, revenus_C_h) - invest_cost_C - fixed_cost_C
+#   - pour le decom : somme(h=0..8760, revenus_C_h) - fixed_cost_C
+# Revenus_C_h = prix_Z_h - cout_marginal_C_h = dual(AreaBalance<Z>::<h>) - cout_marginal_C
+# Incrément d'invest (resp. desinvest) sur le cluster de la zone avec la plus grande (resp. petite) rentabilité
+
+# Update du problème:
+# Mise à jour de la borne sup de DispatchableProduction::area<my_area>::ThermalCluster<my_cluster>::hour<h> avec pour toutes les heures pour les clusters où on a investit / désinvestit
+
+## Mise à jour du pas d'incrément
+# TODO: A spécifier

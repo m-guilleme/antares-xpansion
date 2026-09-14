@@ -6,6 +6,7 @@
 
 #include <antares/api/singleProblemGetter.h>
 #include <antares/api/solver.h>
+#include <antares/solver/lps/LpsFromAntares.h>
 
 #include "antares-xpansion/lpnamer/problem_modifier/XpansionProblemsFromAntaresProvider.h"
 #include "malloc.h"
@@ -18,10 +19,10 @@ ProblemGenerationOptimSimu::ProblemGenerationOptimSimu(
   unsigned int startWeek,
   unsigned int endWeek):
     directories(directories),
-    logger(std::move(logger)),
-    problemManager(problemManager),
     startWeek(startWeek),
-    endWeek(endWeek)
+    endWeek(endWeek),
+    problemManager(problemManager),
+    logger(std::move(logger))
 {
     loadProblemsFromAntares();
 }
@@ -105,10 +106,11 @@ void ProblemGenerationOptimSimu::lpsToProblems(const Antares::Solver::LpsFromAnt
         problemManager->setProblem(pbId, problem);
     }
 
-    auto problems = problemManager->getProblems();
-    if (!problems.empty())
+    if (!problemManager->getProblemIds().empty())
     {
-        startWeek = std::max(startWeek, problems.begin()->first.week);
-        endWeek = std::min(endWeek, problems.rbegin()->first.week);
+        startWeek = std::max(startWeek, problemManager->getFirstProblem()->week);
+        std::shared_ptr<Problem> lastProblem = problemManager->getProblemFromId(
+          *(problemManager->getProblemIds().rbegin()));
+        endWeek = std::min(endWeek, lastProblem->week);
     }
 }

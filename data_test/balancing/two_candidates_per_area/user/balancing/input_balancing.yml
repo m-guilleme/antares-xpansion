@@ -1,0 +1,37 @@
+reliability_standard_dead_band_up: 0.5
+reliability_standard_dead_band_down: 0.5
+# reliability_standard_indicator: NPCAP_HOURS # Or LOLE
+reliability_standard_indicator: LOLE # Or LOLE
+
+areas:
+  area1:
+    reliability_standard: 3.5
+    max_oscillation: 10
+    decommissioning_increment: 500
+    investment_increment: 500
+    decommissioning_candidates_to_type:
+    investment_candidates_to_type:
+      invest_semibase1: semibase_type
+      invest_peak: peak_type
+  area2:
+    reliability_standard: 0.5
+    max_oscillation: 10
+    decommissioning_increment: 500
+    investment_increment: 500
+    decommissioning_candidates_to_type:
+    investment_candidates_to_type:
+      invest_semibase: semibase_type
+      invest_peak2: peak_type
+
+decommissioning_candidates_types:
+investment_candidates_types:
+  semibase_type:
+    derating: 0.0
+    expansion_potential: 4000
+    investment_cost: 126000
+    fixed_om_costs: 0
+  peak_type:
+    derating: 0.0
+    expansion_potential: 3000
+    investment_cost: 60000
+    fixed_om_costs: 0

@@ -1,0 +1,64 @@
+reliability_standard_dead_band_up: 0.5
+reliability_standard_dead_band_down: 0.5
+reliability_standard_indicator: LOLE # Or LOLE
+
+areas:
+  invest_area:
+    reliability_standard: 3.5
+    decommissioning_increment: 1000
+    investment_increment: 500
+    max_oscillation: 30
+    decommissioning_candidates_to_type:
+    investment_candidates_to_type:
+      candidate_1: invest_type_1
+      candidate_2: invest_type_2
+  desinvest_area:
+    reliability_standard: 3.5
+    decommissioning_increment: 1000
+    investment_increment: 500
+    max_oscillation: 30
+    decommissioning_candidates_to_type:
+    investment_candidates_to_type:
+      candidate_1: invest_type_1
+      candidate_2: invest_type_2
+  decom_area:
+    reliability_standard: 3.5
+    decommissioning_increment: 1000
+    investment_increment: 500
+    max_oscillation: 30
+    decommissioning_candidates_to_type:
+      candidate_1: decom_type_1
+      candidate_2: decom_type_2
+    investment_candidates_to_type:
+  recom_area:
+    reliability_standard: 3.5
+    decommissioning_increment: 1000
+    investment_increment: 500
+    max_oscillation: 30
+    decommissioning_candidates_to_type:
+      candidate_1: decom_type_1
+      candidate_2: decom_type_2
+    investment_candidates_to_type:
+
+decommissioning_candidates_types:
+  decom_type_1:
+    derating: 0.0
+    decommissioning_potential: 0.0
+    decommissioning_cost: 10000
+    fixed_om_costs: 1000
+  decom_type_2:
+    derating: 0.0
+    decommissioning_potential: 0.0
+    decommissioning_cost: 10000
+    fixed_om_costs: 1000
+investment_candidates_types:
+  invest_type_1:
+    derating: 0.0
+    expansion_potential: 4000
+    investment_cost: 126000
+    fixed_om_costs: 0
+  invest_type_2:
+    derating: 0.0
+    expansion_potential: 4000
+    investment_cost: 126000
+    fixed_om_costs: 0

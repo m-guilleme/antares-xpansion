@@ -1,0 +1,3 @@
+area,criteria value,criteria target,criteria lower bound,criteria upper bound,status,total capacity change
+area1,4,3.5,3,4,NO ACTION,1650
+area2,1,0.5,0,1,NO ACTION,3500
