@@ -88,10 +88,6 @@ void ProblemGenerationForBalancing::setCapacityDataForOneCandidate(const std::st
                                                                ? lowerBound / upperBound
                                                                : 0.0;
             // if both bound are equal to 0.0 we set as upperonly
-            oneWeekBoundsData[hour].boundType = upperBound == lowerBound && upperBound != 0.0
-                                                  ? BoundType::FIXED
-                                                : lowerBound > 0.0 ? BoundType::BOTH
-                                                                   : BoundType::UPPERONLY;
             oneWeekBoundsData[hour].upBoundRatioToInstalledCap = upperBound;
             if (upperBound > installedCapacity)
             {
@@ -514,10 +510,10 @@ std::optional<CapacityAction> ProblemGenerationForBalancing::determineCapacityAc
     return std::nullopt;
 }
 
-template<typename CandidateType>
-static double extraCost(const Candidate<CandidateType>& candidate)
+template<typename Type>
+static double extraCost(const Candidate<Type>& candidate)
 {
-    if constexpr (std::is_same_v<CandidateType, InvestmentCandidateType>)
+    if constexpr (std::is_same_v<Type, InvestmentCandidateType>)
     {
         return candidate.installedCapacity
                * (candidate.type->investmentCost + candidate.type->fixedOmCosts);
@@ -529,10 +525,10 @@ static double extraCost(const Candidate<CandidateType>& candidate)
     }
 }
 
-template<typename CandidateType>
+template<typename Type>
 std::map<std::string, double> ProblemGenerationForBalancing::computeRentabilityForCandidates(
   const std::string& areaName,
-  const std::map<std::string, Candidate<CandidateType>>& candidates,
+  const std::map<std::string, Candidate<Type>>& candidates,
   const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues,
   CapacityAction action) const
 {
@@ -540,7 +536,7 @@ std::map<std::string, double> ProblemGenerationForBalancing::computeRentabilityF
     for (const auto& [clusterName, candidate]: candidates)
     {
         double value = 0.0;
-        if constexpr (std::is_same_v<CandidateType, InvestmentCandidateType>)
+        if constexpr (std::is_same_v<Type, InvestmentCandidateType>)
         {
             if (action == CapacityAction::INVESTMENT
                 && candidate.installedCapacity == candidate.type->expansionPotential)
@@ -802,18 +798,8 @@ void ProblemGenerationForBalancing::applyActionToCluster(const AreaCluster& area
               double upperValue = oneWeekBoundsDataCandidate[hour].upBoundRatioToInstalledCap
                                   * installedCapacity;
               upperBoundsValue[hour] = upperValue;
-              switch (oneWeekBoundsDataCandidate[hour].boundType)
-              {
-              case BoundType::FIXED:
-                  lowerBoundsValue[hour] = upperValue;
-                  break;
-              case BoundType::BOTH:
-                  lowerBoundsValue[hour] = oneWeekBoundsDataCandidate[hour].lowBoundRatioToUpBound
-                                           * upperValue;
-                  break;
-              default:
-                  lowerBoundsValue[hour] = 0.0;
-              }
+              lowerBoundsValue[hour] = oneWeekBoundsDataCandidate[hour].lowBoundRatioToUpBound
+                                       * upperValue;
           }
           problem->chg_bounds(vecIndices, vecUpperChar, upperBoundsValue);
           problem->chg_bounds(vecIndices, vecLowerChar, lowerBoundsValue);

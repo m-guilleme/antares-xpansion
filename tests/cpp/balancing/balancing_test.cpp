@@ -207,7 +207,6 @@ protected:
                                   const double capacityIncrement,
                                   const double uBoundRatioToInstCap,
                                   const double lBoundRatioToUpBound,
-                                  const BoundType boundType,
                                   const double expectedUpperCapacity,
                                   const double expectedLowerCapacity)
     {
@@ -247,7 +246,6 @@ protected:
                 for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
                 {
                     oneWeekBoundData[hour].lowBoundRatioToUpBound = lBoundRatioToUpBound;
-                    oneWeekBoundData[hour].boundType = boundType;
                     oneWeekBoundData[hour].upBoundRatioToInstalledCap = uBoundRatioToInstCap;
                 }
                 pbg.areas[areaName].investmentCandidates[candidateName].setOneWeekBoundsData(
@@ -268,7 +266,6 @@ protected:
                 for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
                 {
                     oneWeekBoundsData[hour].lowBoundRatioToUpBound = lBoundRatioToUpBound;
-                    oneWeekBoundsData[hour].boundType = boundType;
                     oneWeekBoundsData[hour].upBoundRatioToInstalledCap = uBoundRatioToInstCap;
                 }
                 pbg.areas[areaName].decommissioningCandidates[candidateName].setOneWeekBoundsData(
@@ -528,7 +525,6 @@ TEST_F(BalancingTest, applyInvestmentActionToClusterWithUpperonlyBound)
                              500,
                              1.0,
                              0.0,
-                             BoundType::UPPERONLY,
                              3500,
                              0.0);
     logger->display_message(
@@ -544,7 +540,6 @@ TEST_F(BalancingTest, applyInvestmentActionToClusterWithBothBound)
                              500,
                              1.0,
                              0.9,
-                             BoundType::BOTH,
                              3500,
                              3150);
     logger->display_message("Test of applyActionToCluster with INVESTMENT and Both bound done!");
@@ -557,11 +552,10 @@ TEST_F(BalancingTest, applyInvestmentActionToClusterWithFixedBound)
                              "invest_semibase",
                              CapacityAction::INVESTMENT,
                              500,
+                             0.8,
                              1.0,
-                             0.0,
-                             BoundType::FIXED,
-                             3500,
-                             3500);
+                             2800,
+                             2800);
     logger->display_message("Test of applyActionToCluster with INVESTMENT and Fixed bound done!");
 }
 
@@ -574,7 +568,6 @@ TEST_F(BalancingTest, applyDisinvestmentActionToCluster)
                              500,
                              1.0,
                              0.9,
-                             BoundType::BOTH,
                              2500,
                              2250);
     logger->display_message("Test of applyActionToCluster with DISINVESTMENT done!");
@@ -589,7 +582,6 @@ TEST_F(BalancingTest, applyDecomActionToCluster)
                              500,
                              1.0,
                              0.9,
-                             BoundType::BOTH,
                              500,
                              450);
     logger->display_message("Test of applyActionToCluster with DECOM done!");
@@ -604,7 +596,6 @@ TEST_F(BalancingTest, applyRecomActionToCluster)
                              500,
                              1.0,
                              0.9,
-                             BoundType::BOTH,
                              1500,
                              1350);
     logger->display_message("Test of applyActionToCluster with RECOM done!");

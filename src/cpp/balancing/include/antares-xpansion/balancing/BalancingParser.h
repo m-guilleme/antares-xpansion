@@ -16,13 +16,6 @@ enum class CriterionState
     UNINITIALIZED,
 };
 
-enum class BoundType
-{
-    UPPERONLY,
-    FIXED,
-    BOTH,
-};
-
 constexpr std::string_view to_string(CriterionState state)
 {
     switch (state)
@@ -56,7 +49,6 @@ struct DecommissioningCandidateType
 struct BoundData
 {
     double upBoundRatioToInstalledCap, lowBoundRatioToUpBound;
-    BoundType boundType;
 };
 
 template<typename Type>
