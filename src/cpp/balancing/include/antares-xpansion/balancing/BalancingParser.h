@@ -38,7 +38,7 @@ constexpr std::string_view to_string(CriterionState state)
     }
 }
 
-struct Investment
+struct InvestmentCandidateType
 {
     double derating;
     double expansionPotential;
@@ -46,7 +46,7 @@ struct Investment
     double fixedOmCosts;
 };
 
-struct Decommissioning
+struct DecommissioningCandidateType
 {
     double decommissioningPotential;
     double decommissioningCost;
@@ -62,7 +62,7 @@ struct BoundData
 template<typename Type>
 struct Candidate
 {
-    std::shared_ptr<Type> params;
+    std::shared_ptr<Type> type;
     double installedCapacity;
     double previousInstalledCapacity;
     double initInstalledCapacity;
@@ -85,8 +85,8 @@ struct AreaSettings
     double investmentIncrement;
     double currentInvestmentIncrement;
     int maxOscillation;
-    std::map<std::string, Candidate<Decommissioning>> decommissioningCandidates;
-    std::map<std::string, Candidate<Investment>> investmentCandidates;
+    std::map<std::string, Candidate<DecommissioningCandidateType>> decommissioningCandidates;
+    std::map<std::string, Candidate<InvestmentCandidateType>> investmentCandidates;
     CriterionState oldCriterionState{CriterionState::UNINITIALIZED};
 
     bool isInvestmentPossible() const;
@@ -114,8 +114,9 @@ private:
     double defaultReliabilityStandardDeadBandDown;
     Benders::Criterion::Type reliabilityStandardIndicator;
 
-    std::map<std::string, std::shared_ptr<Decommissioning>> decommissioningCandidatesTypes;
-    std::map<std::string, std::shared_ptr<Investment>> investmentCandidatesTypes;
+    std::map<std::string, std::shared_ptr<DecommissioningCandidateType>>
+      decommissioningCandidatesTypes;
+    std::map<std::string, std::shared_ptr<InvestmentCandidateType>> investmentCandidatesTypes;
 
     void parseGlobalSettings();
     void parseAreasSettings();

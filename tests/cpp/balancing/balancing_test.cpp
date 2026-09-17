@@ -345,9 +345,9 @@ protected:
         {
             pbg.areasSettings[areaName].investmentCandidates[candidateName].installedCapacity
               = installedCapacity;
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].params->investmentCost
+            pbg.areasSettings[areaName].investmentCandidates[candidateName].type->investmentCost
               = investmentCost;
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].params->fixedOmCosts
+            pbg.areasSettings[areaName].investmentCandidates[candidateName].type->fixedOmCosts
               = fixedOmCosts;
         }
         else
@@ -356,11 +356,9 @@ protected:
               = installedCapacity;
             pbg.areasSettings[areaName]
               .decommissioningCandidates[candidateName]
-              .params->decommissioningCost
+              .type->decommissioningCost
               = investmentCost;
-            pbg.areasSettings[areaName]
-              .decommissioningCandidates[candidateName]
-              .params->fixedOmCosts
+            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].type->fixedOmCosts
               = fixedOmCosts;
         }
         // set marginalCost
@@ -446,9 +444,7 @@ protected:
               = capacityValue;
             pbg.areasSettings[areaName].investmentCandidates[candidateName].initInstalledCapacity
               = capacityValue;
-            pbg.areasSettings[areaName]
-              .investmentCandidates[candidateName]
-              .params->expansionPotential
+            pbg.areasSettings[areaName].investmentCandidates[candidateName].type->expansionPotential
               = capacityValue;
             rentability = pbg.computeRentabilityForCandidates(
               areaName,
@@ -466,7 +462,7 @@ protected:
               = capacityValue;
             pbg.areasSettings[areaName]
               .decommissioningCandidates[candidateName]
-              .params->decommissioningPotential
+              .type->decommissioningPotential
               = capacityValue;
             rentability = pbg.computeRentabilityForCandidates(
               areaName,
@@ -509,9 +505,7 @@ protected:
         // set pbg.areaSettings
         pbg.areasSettings["area2"].investmentCandidates["invest_semibase"].initInstalledCapacity
           = initInstalledCapacity;
-        pbg.areasSettings["area2"]
-          .investmentCandidates["invest_semibase"]
-          .params->expansionPotential
+        pbg.areasSettings["area2"].investmentCandidates["invest_semibase"].type->expansionPotential
           = expansionPotential;
         pbg.areasSettings["area2"]
           .decommissioningCandidates["unprofitable_peak"]
@@ -519,7 +513,7 @@ protected:
           = initInstalledCapacity;
         pbg.areasSettings["area2"]
           .decommissioningCandidates["unprofitable_peak"]
-          .params->decommissioningPotential
+          .type->decommissioningPotential
           = decommissioningPotential;
         //  isInvestmentCycle
         if (setLastAction)

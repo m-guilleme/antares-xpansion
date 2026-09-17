@@ -9,7 +9,7 @@ bool AreaSettings::isInvestmentPossible() const
     return std::ranges::any_of(investmentCandidates,
                                [](const auto& entry) {
                                    return entry.second.installedCapacity
-                                          < entry.second.params->expansionPotential;
+                                          < entry.second.type->expansionPotential;
                                });
 }
 
@@ -20,7 +20,7 @@ bool AreaSettings::isDecommissioningPossible() const
     return std::ranges::any_of(decommissioningCandidates,
                                [](const auto& entry) {
                                    return entry.second.installedCapacity
-                                          > entry.second.params->decommissioningPotential;
+                                          > entry.second.type->decommissioningPotential;
                                });
 }
 
@@ -149,7 +149,7 @@ void BalancingParser::parseDecommissioningCandidatesTypes()
         requireField(typeData, "decommissioning_potential", context);
         requireField(typeData, "decommissioning_cost", context);
 
-        auto type = std::make_shared<Decommissioning>();
+        auto type = std::make_shared<DecommissioningCandidateType>();
         type->fixedOmCosts = typeNode.second["fixed_om_costs"].as<double>();
         type->decommissioningPotential = typeData["decommissioning_potential"].as<double>();
         type->decommissioningCost = typeData["decommissioning_cost"].as<double>();
@@ -177,7 +177,7 @@ void BalancingParser::parseInvestmentCandidatesTypes()
         requireField(typeData, "investment_cost", context);
         requireField(typeData, "fixed_om_costs", context);
 
-        auto type = std::make_shared<Investment>();
+        auto type = std::make_shared<InvestmentCandidateType>();
         type->derating = typeData["derating"].as<double>();
         type->expansionPotential = typeData["expansion_potential"].as<double>();
         type->investmentCost = typeData["investment_cost"].as<double>();

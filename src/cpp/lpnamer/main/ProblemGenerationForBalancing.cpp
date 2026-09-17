@@ -531,15 +531,15 @@ std::optional<CapacityAction> ProblemGenerationForBalancing::determineCapacityAc
 template<typename CandidateType>
 static double extraCost(const Candidate<CandidateType>& candidate)
 {
-    if constexpr (std::is_same_v<CandidateType, Investment>)
+    if constexpr (std::is_same_v<CandidateType, InvestmentCandidateType>)
     {
         return candidate.installedCapacity
-               * (candidate.params->investmentCost + candidate.params->fixedOmCosts);
+               * (candidate.type->investmentCost + candidate.type->fixedOmCosts);
     }
     else
     {
         return candidate.installedCapacity
-               * (candidate.params->decommissioningCost + candidate.params->fixedOmCosts);
+               * (candidate.type->decommissioningCost + candidate.type->fixedOmCosts);
     }
 }
 
@@ -554,10 +554,10 @@ std::map<std::string, double> ProblemGenerationForBalancing::computeRentabilityF
     for (const auto& [clusterName, candidate]: candidates)
     {
         double value = 0.0;
-        if constexpr (std::is_same_v<CandidateType, Investment>)
+        if constexpr (std::is_same_v<CandidateType, InvestmentCandidateType>)
         {
             if (action == CapacityAction::INVESTMENT
-                && candidate.installedCapacity == candidate.params->expansionPotential)
+                && candidate.installedCapacity == candidate.type->expansionPotential)
             {
                 continue;
             }
@@ -570,7 +570,7 @@ std::map<std::string, double> ProblemGenerationForBalancing::computeRentabilityF
         else
         {
             if (action == CapacityAction::DECOMMISSIONING
-                && candidate.installedCapacity == candidate.params->decommissioningPotential)
+                && candidate.installedCapacity == candidate.type->decommissioningPotential)
             {
                 continue;
             }
@@ -743,7 +743,7 @@ void ProblemGenerationForBalancing::computeCandidateInstalledCapacity(
         areaSettings.investmentCandidates.at(clusterName).installedCapacity = std::min(
           areaSettings.investmentCandidates.at(clusterName).installedCapacity
             + areaSettings.currentInvestmentIncrement,
-          areaSettings.investmentCandidates.at(clusterName).params->expansionPotential);
+          areaSettings.investmentCandidates.at(clusterName).type->expansionPotential);
         break;
     case CapacityAction::DISINVESTMENT:
         areaSettings.investmentCandidates.at(clusterName).installedCapacity = std::max(
@@ -755,7 +755,7 @@ void ProblemGenerationForBalancing::computeCandidateInstalledCapacity(
         areaSettings.decommissioningCandidates.at(clusterName).installedCapacity = std::max(
           areaSettings.decommissioningCandidates.at(clusterName).installedCapacity
             - areaSettings.currentDecommissioningIncrement,
-          areaSettings.decommissioningCandidates.at(clusterName).params->decommissioningPotential);
+          areaSettings.decommissioningCandidates.at(clusterName).type->decommissioningPotential);
         break;
     case CapacityAction::RECOMMISSIONING:
         areaSettings.decommissioningCandidates.at(clusterName).installedCapacity = std::min(
