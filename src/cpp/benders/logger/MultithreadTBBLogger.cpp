@@ -2,8 +2,11 @@
 
 #include "antares-xpansion/benders/logger/MultithreadTBBLogger.h"
 
-MultithreadTBBLogger::MultithreadTBBLogger(std::filesystem::path logFolder,
-                                           std::filesystem::path logFileName,
+#include "antares-xpansion/benders/factories/LoggerFactories.h"
+#include "antares-xpansion/benders/logger/FilteredLogger.h"
+
+MultithreadTBBLogger::MultithreadTBBLogger(const std::filesystem::path& logFolder,
+                                           const std::string& logFileName,
                                            int nbThreads,
                                            std::optional<LogUtils::LOGLEVEL> verbosity):
     _nbThreads(nbThreads)
@@ -15,9 +18,8 @@ MultithreadTBBLogger::MultithreadTBBLogger(std::filesystem::path logFolder,
     // otherwise will create empty log files
     for (int threadId = 0; threadId < _nbThreads; ++threadId)
     {
-        auto loggerFactory = FileAndStdoutLoggerFactory(
-          logFolder / (std::to_string(threadId) + "_" + logFileName.string()),
-          false);
+        const auto filePath = logFolder / (std::to_string(threadId) + "_" + logFileName);
+        auto loggerFactory = FileAndStdoutLoggerFactory(filePath, false);
         _loggers.emplace(threadId,
                          std::make_shared<FilteredLogger>(loggerFactory.get_logger(), _verbosity));
     }
