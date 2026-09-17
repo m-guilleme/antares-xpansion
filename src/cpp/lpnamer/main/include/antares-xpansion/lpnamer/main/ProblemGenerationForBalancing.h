@@ -49,7 +49,7 @@ class ProblemGenerationForBalancing: public ProblemGenerationOptimSimu
 {
 public:
     explicit ProblemGenerationForBalancing(ConfigurationManager::ConfigDirectories directories,
-                                           std::map<std::string, AreaSettings>& areasSettings,
+                                           std::map<std::string, Area>& areas,
                                            Logger logger,
                                            std::shared_ptr<ProblemManager> problemManager,
                                            std::filesystem::path iterationsLogFileName);
@@ -68,21 +68,21 @@ public:
 
 private:
     bool blocked = false;
-    std::map<std::string, AreaSettings>& areasSettings;
+    std::map<std::string, Area>& areas;
     std::map<AreaCluster, BalancingData> balancingData;
     std::map<AreaCluster, OscillationStatus> oscillationRecords;
     std::map<std::string, CapacityAction> lastActionForArea;
     std::map<std::string, AreaCriterionData> currentAreaCriteriaData;
     std::filesystem::path iterationsLogFileName;
 
-    double lowerThreshold(const AreaSettings& areaSettings) const
+    double lowerThreshold(const Area& area) const
     {
-        return areaSettings.reliabilityStandard - areaSettings.reliabilityStandardDeadBandDown;
+        return area.reliabilityStandard - area.reliabilityStandardDeadBandDown;
     }
 
-    double higherThreshold(const AreaSettings& areaSettings) const
+    double higherThreshold(const Area& area) const
     {
-        return areaSettings.reliabilityStandard + areaSettings.reliabilityStandardDeadBandUp;
+        return area.reliabilityStandard + area.reliabilityStandardDeadBandUp;
     }
 
     void initializeIterativeLogCSV() const;
@@ -96,7 +96,7 @@ private:
     void updateRecords(const AreaCluster& areaCluster, CapacityAction action);
     std::map<AreaCluster, CapacityAction> findAreaClustersToModify(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);
-    CriterionState criterionState(const AreaSettings& areaSettings, double value) const;
+    CriterionState criterionState(const Area& area, double value) const;
     std::map<std::string, AreaCriterionData> computeAreaCriteriaData(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues) const;
     void updateAreaSettingsIncrement(const std::map<std::string, AreaCriterionData>& areaCritState);
@@ -104,12 +104,12 @@ private:
     std::string getBestCluster(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues,
       const std::string& areaName,
-      const AreaSettings& areaSettings,
+      const Area& area,
       CapacityAction action) const;
     void updateOldCriterionState();
     std::optional<CapacityAction> determineCapacityAction(const std::string& areaName,
                                                           CriterionState currentState,
-                                                          const AreaSettings& areaSettings) const;
+                                                          const Area& area) const;
     template<typename CandidateType>
     std::map<std::string, double> computeRentabilityForCandidates(
       const std::string& areaName,
@@ -122,7 +122,7 @@ private:
       const std::unordered_map<std::string, size_t>& varToIndex,
       const std::vector<double>& objCoeffs);
     void computeCandidateInstalledCapacity(CapacityAction action,
-                                           AreaSettings& areaSettings,
+                                           Area& area,
                                            const std::string& clusterName);
     friend class BalancingTest;
 };

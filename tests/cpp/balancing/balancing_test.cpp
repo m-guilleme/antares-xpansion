@@ -73,34 +73,25 @@ protected:
                                                                false,
                                                                true,
                                                                "initial_problems");
-        ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(
-          directories,
-          dummyBalParser.areaSettings,
-          logger,
-          problemManager,
-          iterLogFilePath);
+        ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(directories,
+                                                                          dummyBalParser.areas,
+                                                                          logger,
+                                                                          problemManager,
+                                                                          iterLogFilePath);
 
         // set real test data
-        // set pbg.areaSettings
+        // set pbg.areas
         const std::filesystem::path balancingConfigFilePath(
           "data_test/balancing/find_area_cluster_to_modify/input_balancing.yml");
         BalancingParser balParser(balancingConfigFilePath);
-        pbg.areasSettings = balParser.areaSettings;
-        pbg.areasSettings["desinvest_area"].investmentCandidates["candidate_1"].installedCapacity
+        pbg.areas = balParser.areas;
+        pbg.areas["desinvest_area"].investmentCandidates["candidate_1"].installedCapacity = 1000;
+        pbg.areas["desinvest_area"].investmentCandidates["candidate_2"].installedCapacity = 1000;
+        pbg.areas["decom_area"].decommissioningCandidates["candidate_1"].installedCapacity = 1000;
+        pbg.areas["decom_area"].decommissioningCandidates["candidate_2"].installedCapacity = 1000;
+        pbg.areas["recom_area"].decommissioningCandidates["candidate_1"].initInstalledCapacity
           = 1000;
-        pbg.areasSettings["desinvest_area"].investmentCandidates["candidate_2"].installedCapacity
-          = 1000;
-        pbg.areasSettings["decom_area"].decommissioningCandidates["candidate_1"].installedCapacity
-          = 1000;
-        pbg.areasSettings["decom_area"].decommissioningCandidates["candidate_2"].installedCapacity
-          = 1000;
-        pbg.areasSettings["recom_area"]
-          .decommissioningCandidates["candidate_1"]
-          .initInstalledCapacity
-          = 1000;
-        pbg.areasSettings["recom_area"]
-          .decommissioningCandidates["candidate_2"]
-          .initInstalledCapacity
+        pbg.areas["recom_area"].decommissioningCandidates["candidate_2"].initInstalledCapacity
           = 1000;
         // set pbg.lastActionForArea
         std::map<std::string, CapacityAction> lastActionForArea = {
@@ -176,15 +167,15 @@ protected:
             }
         }
         // we check that the criterion state have been correctly set
-        for (const auto& [areaName, areaSettings]: pbg.areasSettings)
+        for (const auto& [areaName, area]: pbg.areas)
         {
             if (areaName == "invest_area" || areaName == "recom_area")
             {
-                EXPECT_TRUE(areaSettings.oldCriterionState == CriterionState::HIGHER);
+                EXPECT_TRUE(area.oldCriterionState == CriterionState::HIGHER);
             }
             if (areaName == "desinvest_area" || areaName == "decom_area")
             {
-                EXPECT_TRUE(areaSettings.oldCriterionState == CriterionState::LOWER);
+                EXPECT_TRUE(area.oldCriterionState == CriterionState::LOWER);
             }
         }
         logger->display_message("Test of findAreaClusterToModify done!");
@@ -234,21 +225,21 @@ protected:
         BalancingParser balParser(inputBalFilePath);
         auto problemManager = std::make_shared<ProblemManager>();
         ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(directories,
-                                                                          balParser.areaSettings,
+                                                                          balParser.areas,
                                                                           logger,
                                                                           problemManager,
                                                                           iterLogFilePath);
 
-        // set pbg.areaSettings
+        // set pbg.areas
         double newBoundRef;
         int multForUpperBoundLocation;
-        pbg.areasSettings[areaName].currentInvestmentIncrement = capacityIncrement;
+        pbg.areas[areaName].currentInvestmentIncrement = capacityIncrement;
         if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
         {
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].initInstalledCapacity
+            pbg.areas[areaName].investmentCandidates[candidateName].initInstalledCapacity
               = 4 * capacityIncrement; // we set initInstalledCapacity lower to allow disinvestment
-            pbg.areasSettings[areaName].currentInvestmentIncrement = capacityIncrement;
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].installedCapacity
+            pbg.areas[areaName].currentInvestmentIncrement = capacityIncrement;
+            pbg.areas[areaName].investmentCandidates[candidateName].installedCapacity
               = 6 * capacityIncrement;
             for (const auto& pbId: problemManager->getProblemIds())
             {
@@ -259,19 +250,17 @@ protected:
                     oneWeekBoundData[hour].boundType = boundType;
                     oneWeekBoundData[hour].upBoundRatioToInstalledCap = uBoundRatioToInstCap;
                 }
-                pbg.areasSettings[areaName]
-                  .investmentCandidates[candidateName]
-                  .setOneWeekBoundsData(pbId, oneWeekBoundData);
+                pbg.areas[areaName].investmentCandidates[candidateName].setOneWeekBoundsData(
+                  pbId,
+                  oneWeekBoundData);
             }
         }
         else
         {
-            pbg.areasSettings[areaName]
-              .decommissioningCandidates[candidateName]
-              .initInstalledCapacity
+            pbg.areas[areaName].decommissioningCandidates[candidateName].initInstalledCapacity
               = 4 * capacityIncrement; // we set initInstalledCapacity higher to allow recom
-            pbg.areasSettings[areaName].currentDecommissioningIncrement = capacityIncrement;
-            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].installedCapacity
+            pbg.areas[areaName].currentDecommissioningIncrement = capacityIncrement;
+            pbg.areas[areaName].decommissioningCandidates[candidateName].installedCapacity
               = 2 * capacityIncrement;
             for (const auto& pbId: problemManager->getProblemIds())
             {
@@ -282,14 +271,14 @@ protected:
                     oneWeekBoundsData[hour].boundType = boundType;
                     oneWeekBoundsData[hour].upBoundRatioToInstalledCap = uBoundRatioToInstCap;
                 }
-                pbg.areasSettings[areaName]
-                  .decommissioningCandidates[candidateName]
-                  .setOneWeekBoundsData(pbId, oneWeekBoundsData);
+                pbg.areas[areaName].decommissioningCandidates[candidateName].setOneWeekBoundsData(
+                  pbId,
+                  oneWeekBoundsData);
             }
         }
 
         const auto& varIndices = pbg.balancingData.at({areaName, candidateName}).dispProdVarIndices;
-        auto& areaSettings = pbg.areasSettings.at(areaName);
+        auto& area = pbg.areas.at(areaName);
         std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
 
         // run applyActionToCluster
@@ -334,7 +323,7 @@ protected:
                                                                true,
                                                                "initial_problems");
         ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(directories,
-                                                                          balParser.areaSettings,
+                                                                          balParser.areas,
                                                                           logger,
                                                                           problemManager,
                                                                           iterLogFilePath);
@@ -343,22 +332,20 @@ protected:
         // set investment cost and fixed om cost
         if (action == CapacityAction::INVESTMENT)
         {
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].installedCapacity
+            pbg.areas[areaName].investmentCandidates[candidateName].installedCapacity
               = installedCapacity;
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].type->investmentCost
+            pbg.areas[areaName].investmentCandidates[candidateName].type->investmentCost
               = investmentCost;
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].type->fixedOmCosts
+            pbg.areas[areaName].investmentCandidates[candidateName].type->fixedOmCosts
               = fixedOmCosts;
         }
         else
         {
-            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].installedCapacity
+            pbg.areas[areaName].decommissioningCandidates[candidateName].installedCapacity
               = installedCapacity;
-            pbg.areasSettings[areaName]
-              .decommissioningCandidates[candidateName]
-              .type->decommissioningCost
+            pbg.areas[areaName].decommissioningCandidates[candidateName].type->decommissioningCost
               = investmentCost;
-            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].type->fixedOmCosts
+            pbg.areas[areaName].decommissioningCandidates[candidateName].type->fixedOmCosts
               = fixedOmCosts;
         }
         // set marginalCost
@@ -387,7 +374,7 @@ protected:
         {
             rentability = pbg.computeRentabilityForCandidates(
               areaName,
-              pbg.areasSettings[areaName].investmentCandidates,
+              pbg.areas[areaName].investmentCandidates,
               simuValues,
               action);
         }
@@ -395,7 +382,7 @@ protected:
         {
             rentability = pbg.computeRentabilityForCandidates(
               areaName,
-              pbg.areasSettings[areaName].decommissioningCandidates,
+              pbg.areas[areaName].decommissioningCandidates,
               simuValues,
               action);
         }
@@ -427,7 +414,7 @@ protected:
         BalancingParser balParser(inputBalFilePath);
         auto problemManager = std::make_shared<ProblemManager>();
         ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(directories,
-                                                                          balParser.areaSettings,
+                                                                          balParser.areas,
                                                                           logger,
                                                                           problemManager,
                                                                           iterLogFilePath);
@@ -440,33 +427,31 @@ protected:
         std::map<std::string, double> rentability;
         if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
         {
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].installedCapacity
+            pbg.areas[areaName].investmentCandidates[candidateName].installedCapacity
               = capacityValue;
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].initInstalledCapacity
+            pbg.areas[areaName].investmentCandidates[candidateName].initInstalledCapacity
               = capacityValue;
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].type->expansionPotential
+            pbg.areas[areaName].investmentCandidates[candidateName].type->expansionPotential
               = capacityValue;
             rentability = pbg.computeRentabilityForCandidates(
               areaName,
-              pbg.areasSettings[areaName].investmentCandidates,
+              pbg.areas[areaName].investmentCandidates,
               simuValues,
               action);
         }
         else
         {
-            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].installedCapacity
+            pbg.areas[areaName].decommissioningCandidates[candidateName].installedCapacity
               = capacityValue;
-            pbg.areasSettings[areaName]
-              .decommissioningCandidates[candidateName]
-              .initInstalledCapacity
+            pbg.areas[areaName].decommissioningCandidates[candidateName].initInstalledCapacity
               = capacityValue;
-            pbg.areasSettings[areaName]
+            pbg.areas[areaName]
               .decommissioningCandidates[candidateName]
               .type->decommissioningPotential
               = capacityValue;
             rentability = pbg.computeRentabilityForCandidates(
               areaName,
-              pbg.areasSettings[areaName].decommissioningCandidates,
+              pbg.areas[areaName].decommissioningCandidates,
               simuValues,
               action);
         }
@@ -498,20 +483,18 @@ protected:
         BalancingParser balParser(inputBalFilePath);
         auto problemManager = std::make_shared<ProblemManager>();
         ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(directories,
-                                                                          balParser.areaSettings,
+                                                                          balParser.areas,
                                                                           logger,
                                                                           problemManager,
                                                                           iterLogFilePath);
-        // set pbg.areaSettings
-        pbg.areasSettings["area2"].investmentCandidates["invest_semibase"].initInstalledCapacity
+        // set pbg.areas
+        pbg.areas["area2"].investmentCandidates["invest_semibase"].initInstalledCapacity
           = initInstalledCapacity;
-        pbg.areasSettings["area2"].investmentCandidates["invest_semibase"].type->expansionPotential
+        pbg.areas["area2"].investmentCandidates["invest_semibase"].type->expansionPotential
           = expansionPotential;
-        pbg.areasSettings["area2"]
-          .decommissioningCandidates["unprofitable_peak"]
-          .initInstalledCapacity
+        pbg.areas["area2"].decommissioningCandidates["unprofitable_peak"].initInstalledCapacity
           = initInstalledCapacity;
-        pbg.areasSettings["area2"]
+        pbg.areas["area2"]
           .decommissioningCandidates["unprofitable_peak"]
           .type->decommissioningPotential
           = decommissioningPotential;
@@ -524,7 +507,7 @@ protected:
         std::optional<CapacityAction> resCapacityAction = pbg.determineCapacityAction(
           "area2",
           criterionState,
-          pbg.areasSettings["area2"]);
+          pbg.areas["area2"]);
         // assert results
         // we check that the correct action has been selected
         EXPECT_TRUE(resCapacityAction == expectedCapacityAction);

@@ -4,7 +4,7 @@
 
 /// @brief Check if investment is possible for the area
 /// @return true if investment is possible, false otherwise
-bool AreaSettings::isInvestmentPossible() const
+bool Area::isInvestmentPossible() const
 {
     return std::ranges::any_of(investmentCandidates,
                                [](const auto& entry) {
@@ -15,7 +15,7 @@ bool AreaSettings::isInvestmentPossible() const
 
 /// @brief Check if decommissioning is possible for the area
 /// @return true if decommissioning is possible, false otherwise
-bool AreaSettings::isDecommissioningPossible() const
+bool Area::isDecommissioningPossible() const
 {
     return std::ranges::any_of(decommissioningCandidates,
                                [](const auto& entry) {
@@ -26,7 +26,7 @@ bool AreaSettings::isDecommissioningPossible() const
 
 /// @brief Check if disinvestment is possible for the area
 /// @return true if disinvestment is possible, false otherwise
-bool AreaSettings::isDisinvestmentPossible() const
+bool Area::isDisinvestmentPossible() const
 {
     return std::ranges::any_of(investmentCandidates,
                                [](const auto& entry) {
@@ -37,7 +37,7 @@ bool AreaSettings::isDisinvestmentPossible() const
 
 /// @brief Check if recommissioning is possible for the area
 /// @return true if recommissioning is possible, false otherwise
-bool AreaSettings::isRecommissioningPossible() const
+bool Area::isRecommissioningPossible() const
 {
     return std::ranges::any_of(decommissioningCandidates,
                                [](const auto& entry) {
@@ -246,7 +246,7 @@ void BalancingParser::parseAreasSettings()
         requireField(areaData, "investment_increment", context);
         requireField(areaData, "max_oscillation", context);
 
-        AreaSettings area;
+        Area area;
         area.reliabilityStandard = areaData["reliability_standard"].as<double>();
         area.decommissioningIncrement = areaData["decommissioning_increment"].as<double>();
         area.currentDecommissioningIncrement = area.decommissioningIncrement;
@@ -278,7 +278,7 @@ void BalancingParser::parseAreasSettings()
                               areaName,
                               area.investmentCandidates);
 
-        areaSettings[areaName] = std::move(area);
+        areas[areaName] = std::move(area);
     }
 }
 

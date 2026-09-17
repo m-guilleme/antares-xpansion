@@ -75,7 +75,7 @@ struct Candidate
     }
 };
 
-struct AreaSettings
+struct Area
 {
     double reliabilityStandard;
     double reliabilityStandardDeadBandUp;
@@ -104,7 +104,7 @@ public:
 
     Benders::Criterion::Type getReliabilityStandardIndicator() const;
 
-    std::map<std::string, AreaSettings> areaSettings;
+    std::map<std::string, Area> areas;
 
 private:
     std::filesystem::path pathToYamlConfigFile;

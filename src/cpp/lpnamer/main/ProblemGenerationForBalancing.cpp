@@ -11,17 +11,17 @@
 
 /// @brief Launch the simulation and save the problems
 /// @param directories The directories to use for the problems generation
-/// @param areaSettings The area investments to use for the problems modification
+/// @param areas The area investments to use for the problems modification
 /// @param logger The logger to use
 /// @param solverName The name of the solver to use
 ProblemGenerationForBalancing::ProblemGenerationForBalancing(
   ConfigurationManager::ConfigDirectories directories,
-  std::map<std::string, AreaSettings>& areasSettings,
+  std::map<std::string, Area>& areas,
   Logger logger,
   std::shared_ptr<ProblemManager> problemManager,
   std::filesystem::path iterationsLogFileName):
     ProblemGenerationOptimSimu(directories, logger, problemManager),
-    areasSettings(areasSettings),
+    areas(areas),
     iterationsLogFileName(iterationsLogFileName)
 {
     fillDispProdVarIndicesAndMarginalCosts();
@@ -122,7 +122,7 @@ void ProblemGenerationForBalancing::setCapacityDataForOneCandidate(const std::st
 
 void ProblemGenerationForBalancing::setCapacitiesDataForCandidates()
 {
-    for (auto& [areaName, areaSetting]: areasSettings)
+    for (auto& [areaName, areaSetting]: areas)
     {
         for (auto& [clusterName, candidate]: areaSetting.investmentCandidates)
         {
@@ -171,16 +171,16 @@ void ProblemGenerationForBalancing::fillDispProdVarIndicesAndMarginalCosts()
 
     const auto varToIndex = buildVarToIndex(vars);
 
-    for (const auto& [areaName, areaSettings]: areasSettings)
+    for (const auto& [areaName, area]: areas)
     {
-        for (const auto& clusterName: areaSettings.investmentCandidates | std::views::keys)
+        for (const auto& clusterName: area.investmentCandidates | std::views::keys)
         {
             fillDispProdVarIndicesAndMarginalCostsForArea(areaName,
                                                           clusterName,
                                                           varToIndex,
                                                           objCoeffs);
         }
-        for (const auto& clusterName: areaSettings.decommissioningCandidates | std::views::keys)
+        for (const auto& clusterName: area.decommissioningCandidates | std::views::keys)
         {
             fillDispProdVarIndicesAndMarginalCostsForArea(areaName,
                                                           clusterName,
@@ -229,30 +229,29 @@ void ProblemGenerationForBalancing::logCriterionAndAreaSettings(
            << " | max oscillation reached : " << std::boolalpha << maxOscillationReached(areaName)
            << "\n";
         ss << "  Average criteria value: " << criterionData.first;
-        const auto& areaSettings = areasSettings.at(areaName);
+        const auto& area = areas.at(areaName);
         if (criterionData.second != CriterionState::VALID)
         {
             double threshold;
             if (criterionData.second == CriterionState::HIGHER)
             {
-                ss << " (which is above the threshold of " << higherThreshold(areaSettings) << ")";
+                ss << " (which is above the threshold of " << higherThreshold(area) << ")";
             }
             else
             {
-                ss << " (which is below the threshold of " << lowerThreshold(areaSettings) << ")";
+                ss << " (which is below the threshold of " << lowerThreshold(area) << ")";
             }
         }
         ss << "\n";
 
-        for (const auto& [clusterName, investmentCandidate]: areaSettings.investmentCandidates)
+        for (const auto& [clusterName, investmentCandidate]: area.investmentCandidates)
         {
             ss << "  Invested capacity for candidate cluster " << clusterName << ": "
                << investmentCandidate.installedCapacity
                << " | oscillation : " << oscillationRecords.at({areaName, clusterName}).first
                << "\n";
         }
-        for (const auto& [clusterName, decommissioningCandidate]:
-             areaSettings.decommissioningCandidates)
+        for (const auto& [clusterName, decommissioningCandidate]: area.decommissioningCandidates)
         {
             ss << "  Decommissioned capacity for candidate cluster " << clusterName << ": "
                << decommissioningCandidate.installedCapacity
@@ -308,13 +307,12 @@ void ProblemGenerationForBalancing::saveCriterionAndAreaSettingsToIterativeLogCS
 
     for (const auto& [areaName, criterionData]: currentAreaCriteriaData)
     {
-        const auto& areaSettings = areasSettings.at(areaName);
-        for (const auto& [clusterName, investmentCandidate]: areaSettings.investmentCandidates)
+        const auto& area = areas.at(areaName);
+        for (const auto& [clusterName, investmentCandidate]: area.investmentCandidates)
         {
             writeLineToFile(areaName, clusterName, criterionData.second, investmentCandidate);
         }
-        for (const auto& [clusterName, decommissioningCandidate]:
-             areaSettings.decommissioningCandidates)
+        for (const auto& [clusterName, decommissioningCandidate]: area.decommissioningCandidates)
         {
             writeLineToFile(areaName, clusterName, criterionData.second, decommissioningCandidate);
         }
@@ -334,8 +332,8 @@ void ProblemGenerationForBalancing::saveClusterResultsToCSV(
 
     for (const auto& [areaName, criterionState]: currentAreaCriteriaData)
     {
-        const auto& areaSettings = areasSettings.at(areaName);
-        for (const auto& [clusterName, investmentCandidate]: areaSettings.investmentCandidates)
+        const auto& area = areas.at(areaName);
+        for (const auto& [clusterName, investmentCandidate]: area.investmentCandidates)
         {
             file << areaName << "," << clusterName << "," << investmentCandidate.installedCapacity
                  << ","
@@ -343,8 +341,7 @@ void ProblemGenerationForBalancing::saveClusterResultsToCSV(
                       - investmentCandidate.initInstalledCapacity
                  << "\n";
         }
-        for (const auto& [clusterName, decommissioningCandidate]:
-             areaSettings.decommissioningCandidates)
+        for (const auto& [clusterName, decommissioningCandidate]: area.decommissioningCandidates)
         {
             file << areaName << "," << clusterName << ","
                  << decommissioningCandidate.installedCapacity << ","
@@ -370,34 +367,25 @@ void ProblemGenerationForBalancing::saveCriterionAndAreaSettingsToCSV(
 
     for (const auto& [areaName, criterionState]: currentAreaCriteriaData)
     {
-        const auto& areaSettings = areasSettings.at(areaName);
-
+        const auto& area = areas.at(areaName);
         double criteriaValue = criterionState.first;
-
-        // std::string status = (criteriaValue < lowerThreshold(areaSettings)
-        //                       || criteriaValue > higherThreshold(areaSettings))
-        //                        ? "*"
-        //                        : "OK";
-        std::string status = (criteriaValue < lowerThreshold(areaSettings))    ? "LOWER"
-                             : (criteriaValue > higherThreshold(areaSettings)) ? "HIGHER"
-                                                                               : "NO ACTION";
+        std::string status = (criteriaValue < lowerThreshold(area))    ? "LOWER"
+                             : (criteriaValue > higherThreshold(area)) ? "HIGHER"
+                                                                       : "NO ACTION";
         double totalCapacityChange(0.0);
-
-        for (const auto& [clusterName, investmentCandidate]: areaSettings.investmentCandidates)
+        for (const auto& [clusterName, investmentCandidate]: area.investmentCandidates)
         {
             totalCapacityChange += investmentCandidate.installedCapacity
                                    - investmentCandidate.initInstalledCapacity;
         }
-        for (const auto& [clusterName, decommissioningCandidate]:
-             areaSettings.decommissioningCandidates)
+        for (const auto& [clusterName, decommissioningCandidate]: area.decommissioningCandidates)
         {
             totalCapacityChange += decommissioningCandidate.installedCapacity
                                    - decommissioningCandidate.initInstalledCapacity;
         }
-
-        file << areaName << "," << criteriaValue << "," << areaSettings.reliabilityStandard << ","
-             << lowerThreshold(areaSettings) << "," << higherThreshold(areaSettings) << ","
-             << status << "," << totalCapacityChange << "\n";
+        file << areaName << "," << criteriaValue << "," << area.reliabilityStandard << ","
+             << lowerThreshold(area) << "," << higherThreshold(area) << "," << status << ","
+             << totalCapacityChange << "\n";
     }
 }
 
@@ -410,7 +398,7 @@ std::map<AreaCluster, CapacityAction> ProblemGenerationForBalancing::findAreaClu
     std::map<AreaCluster, CapacityAction> areaClusterToModify;
     updateAreaSettingsIncrement(currentAreaCriteriaData);
 
-    for (const auto& [areaName, areaSettings]: areasSettings)
+    for (const auto& [areaName, area]: areas)
     {
         const CriterionState current = currentAreaCriteriaData.at(areaName).second;
 
@@ -419,15 +407,13 @@ std::map<AreaCluster, CapacityAction> ProblemGenerationForBalancing::findAreaClu
             continue;
         }
 
-        std::optional<CapacityAction> action = determineCapacityAction(areaName,
-                                                                       current,
-                                                                       areaSettings);
+        std::optional<CapacityAction> action = determineCapacityAction(areaName, current, area);
         // if no action possible, no cluster will be modified
         if (action.has_value())
         {
             const std::string clusterName = getBestCluster(simuValues,
                                                            areaName,
-                                                           areaSettings,
+                                                           area,
                                                            action.value());
             areaClusterToModify[{areaName, clusterName}] = action.value();
         }
@@ -440,12 +426,12 @@ std::map<AreaCluster, CapacityAction> ProblemGenerationForBalancing::findAreaClu
 /// @brief Find the action to apply from the criterion states and area investment parameters
 /// @param areaName The name of the area
 /// @param currentState The current criterion state
-/// @param areaSettings The area investment parameters
+/// @param area The area investment parameters
 /// @return The action to apply
 std::optional<CapacityAction> ProblemGenerationForBalancing::determineCapacityAction(
   const std::string& areaName,
   CriterionState currentState,
-  const AreaSettings& areaSettings) const
+  const Area& area) const
 {
     std::optional<CapacityAction> previousAction;
     if (lastActionForArea.find(areaName) != lastActionForArea.end())
@@ -473,44 +459,44 @@ std::optional<CapacityAction> ProblemGenerationForBalancing::determineCapacityAc
 
     if (isInvestmentCycle && isHigher)
     {
-        if (areaSettings.isInvestmentPossible())
+        if (area.isInvestmentPossible())
         {
             return CapacityAction::INVESTMENT;
         }
-        if (areaSettings.isRecommissioningPossible())
+        if (area.isRecommissioningPossible())
         {
             return CapacityAction::RECOMMISSIONING;
         }
     }
     else if (isInvestmentCycle && !isHigher)
     {
-        if (areaSettings.isDisinvestmentPossible())
+        if (area.isDisinvestmentPossible())
         {
             return CapacityAction::DISINVESTMENT;
         }
-        if (areaSettings.isDecommissioningPossible())
+        if (area.isDecommissioningPossible())
         {
             return CapacityAction::DECOMMISSIONING;
         }
     }
     else if (isHigher)
     {
-        if (areaSettings.isRecommissioningPossible())
+        if (area.isRecommissioningPossible())
         {
             return CapacityAction::RECOMMISSIONING;
         }
-        if (areaSettings.isInvestmentPossible())
+        if (area.isInvestmentPossible())
         {
             return CapacityAction::INVESTMENT;
         }
     }
     else
     {
-        if (areaSettings.isDecommissioningPossible())
+        if (area.isDecommissioningPossible())
         {
             return CapacityAction::DECOMMISSIONING;
         }
-        if (areaSettings.isDisinvestmentPossible())
+        if (area.isDisinvestmentPossible())
         {
             return CapacityAction::DISINVESTMENT;
         }
@@ -621,13 +607,13 @@ static std::string selectBestClusterFromRentability(
 /// @brief Find the best cluster for a given area
 /// @param simuValues The simulation values to look for the cluster selection
 /// @param areaName The name of the area to find the best cluster for
-/// @param areaSettings The area investment parameters
+/// @param area The area investment parameters
 /// @param action The action to apply for which the best cluster is looked for
 /// @return The name of the best cluster for the given area and action
 std::string ProblemGenerationForBalancing::getBestCluster(
   const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues,
   const std::string& areaName,
-  const AreaSettings& areaSettings,
+  const Area& area,
   CapacityAction action) const
 {
     const bool isInvestmentAction = action == CapacityAction::INVESTMENT
@@ -637,14 +623,14 @@ std::string ProblemGenerationForBalancing::getBestCluster(
     if (isInvestmentAction)
     {
         rentability = computeRentabilityForCandidates(areaName,
-                                                      areaSettings.investmentCandidates,
+                                                      area.investmentCandidates,
                                                       simuValues,
                                                       action);
     }
     else
     {
         rentability = computeRentabilityForCandidates(areaName,
-                                                      areaSettings.decommissioningCandidates,
+                                                      area.decommissioningCandidates,
                                                       simuValues,
                                                       action);
     }
@@ -657,19 +643,19 @@ std::string ProblemGenerationForBalancing::getBestCluster(
 void ProblemGenerationForBalancing::updateAreaSettingsIncrement(
   const std::map<std::string, AreaCriterionData>& areaCritData)
 {
-    for (auto& [area, areaSettings]: areasSettings)
+    for (auto& [areaName, area]: areas)
     {
-        if (areaSettings.oldCriterionState != areaCritData.at(area).second
-            && areaSettings.oldCriterionState != CriterionState::UNINITIALIZED
-            && areaCritData.at(area).second != CriterionState::VALID)
+        if (area.oldCriterionState != areaCritData.at(areaName).second
+            && area.oldCriterionState != CriterionState::UNINITIALIZED
+            && areaCritData.at(areaName).second != CriterionState::VALID)
         {
-            areaSettings.currentInvestmentIncrement = std::max(
-              areaSettings.investmentIncrement * 0.1,
-              areaSettings.currentInvestmentIncrement - 0.1 * areaSettings.investmentIncrement);
-            areaSettings.currentDecommissioningIncrement = std::max(
-              areaSettings.decommissioningIncrement * 0.1,
-              areaSettings.currentDecommissioningIncrement
-                - 0.1 * areaSettings.decommissioningIncrement);
+            area.currentInvestmentIncrement = std::max(area.investmentIncrement * 0.1,
+                                                       area.currentInvestmentIncrement
+                                                         - 0.1 * area.investmentIncrement);
+            area.currentDecommissioningIncrement = std::max(area.decommissioningIncrement * 0.1,
+                                                            area.currentDecommissioningIncrement
+                                                              - 0.1
+                                                                  * area.decommissioningIncrement);
         }
     }
 }
@@ -678,25 +664,24 @@ void ProblemGenerationForBalancing::updateAreaSettingsIncrement(
 /// @param areaCritState The current criterion states to set as old criterion states
 void ProblemGenerationForBalancing::updateOldCriterionState()
 {
-    for (auto& [area, areaSettings]: areasSettings)
+    for (auto& [areaName, area]: areas)
     {
-        areaSettings.oldCriterionState = currentAreaCriteriaData.at(area).second;
+        area.oldCriterionState = currentAreaCriteriaData.at(areaName).second;
     }
 }
 
 /// @brief Compute the criterion state from the area investment parameters and the criterion
 /// value
-/// @param areaSettings The area investment parameters to use for the computation
+/// @param area The area investment parameters to use for the computation
 /// @param value The criterion value to use for the computation
 /// @return The criterion state computed
-CriterionState ProblemGenerationForBalancing::criterionState(const AreaSettings& areaSettings,
-                                                             double value) const
+CriterionState ProblemGenerationForBalancing::criterionState(const Area& area, double value) const
 {
-    if (value < lowerThreshold(areaSettings))
+    if (value < lowerThreshold(area))
     {
         return CriterionState::LOWER;
     }
-    else if (value > higherThreshold(areaSettings))
+    else if (value > higherThreshold(area))
     {
         return CriterionState::HIGHER;
     }
@@ -714,9 +699,9 @@ std::map<std::string, AreaCriterionData> ProblemGenerationForBalancing::computeA
 {
     std::map<std::string, AreaCriterionData> areaCriteriaState;
     const auto avgAreaCriteria = computeAverageAreaCriteriaValues(simuValues);
-    for (const auto& [area, value]: avgAreaCriteria)
+    for (const auto& [areaName, value]: avgAreaCriteria)
     {
-        areaCriteriaState[area] = {value, criterionState(areasSettings[area], value)};
+        areaCriteriaState[areaName] = {value, criterionState(areas[areaName], value)};
     }
     return areaCriteriaState;
 }
@@ -730,38 +715,38 @@ void ProblemGenerationForBalancing::updateAreaCriteriaData(
 
 /// @brief Compute the new candidate's installed capacity
 /// @param action The action to apply
-/// @param areaSettings The area investment data to update
+/// @param area The area investment data to update
 /// @param clusterName The name of the cluster to update
 void ProblemGenerationForBalancing::computeCandidateInstalledCapacity(
   CapacityAction action,
-  AreaSettings& areaSettings,
+  Area& area,
   const std::string& clusterName)
 {
     switch (action)
     {
     case CapacityAction::INVESTMENT:
-        areaSettings.investmentCandidates.at(clusterName).installedCapacity = std::min(
-          areaSettings.investmentCandidates.at(clusterName).installedCapacity
-            + areaSettings.currentInvestmentIncrement,
-          areaSettings.investmentCandidates.at(clusterName).type->expansionPotential);
+        area.investmentCandidates.at(clusterName).installedCapacity = std::min(
+          area.investmentCandidates.at(clusterName).installedCapacity
+            + area.currentInvestmentIncrement,
+          area.investmentCandidates.at(clusterName).type->expansionPotential);
         break;
     case CapacityAction::DISINVESTMENT:
-        areaSettings.investmentCandidates.at(clusterName).installedCapacity = std::max(
-          areaSettings.investmentCandidates.at(clusterName).installedCapacity
-            - areaSettings.currentInvestmentIncrement,
-          areaSettings.investmentCandidates.at(clusterName).initInstalledCapacity);
+        area.investmentCandidates.at(clusterName).installedCapacity = std::max(
+          area.investmentCandidates.at(clusterName).installedCapacity
+            - area.currentInvestmentIncrement,
+          area.investmentCandidates.at(clusterName).initInstalledCapacity);
         break;
     case CapacityAction::DECOMMISSIONING:
-        areaSettings.decommissioningCandidates.at(clusterName).installedCapacity = std::max(
-          areaSettings.decommissioningCandidates.at(clusterName).installedCapacity
-            - areaSettings.currentDecommissioningIncrement,
-          areaSettings.decommissioningCandidates.at(clusterName).type->decommissioningPotential);
+        area.decommissioningCandidates.at(clusterName).installedCapacity = std::max(
+          area.decommissioningCandidates.at(clusterName).installedCapacity
+            - area.currentDecommissioningIncrement,
+          area.decommissioningCandidates.at(clusterName).type->decommissioningPotential);
         break;
     case CapacityAction::RECOMMISSIONING:
-        areaSettings.decommissioningCandidates.at(clusterName).installedCapacity = std::min(
-          areaSettings.decommissioningCandidates.at(clusterName).installedCapacity
-            + areaSettings.currentDecommissioningIncrement,
-          areaSettings.decommissioningCandidates.at(clusterName).initInstalledCapacity);
+        area.decommissioningCandidates.at(clusterName).installedCapacity = std::min(
+          area.decommissioningCandidates.at(clusterName).installedCapacity
+            + area.currentDecommissioningIncrement,
+          area.decommissioningCandidates.at(clusterName).initInstalledCapacity);
         break;
     }
 }
@@ -777,18 +762,16 @@ void ProblemGenerationForBalancing::applyActionToCluster(const AreaCluster& area
     const auto& varIndices = balancingData.at(areaCluster).dispProdVarIndices;
     std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
 
-    auto& areaSettings = areasSettings.at(areaCluster.first);
-    computeCandidateInstalledCapacity(action, areaSettings, areaCluster.second);
+    auto& area = areas.at(areaCluster.first);
+    computeCandidateInstalledCapacity(action, area, areaCluster.second);
     double installedCapacity;
     if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
     {
-        installedCapacity = areaSettings.investmentCandidates.at(areaCluster.second)
-                              .installedCapacity;
+        installedCapacity = area.investmentCandidates.at(areaCluster.second).installedCapacity;
     }
     else
     {
-        installedCapacity = areaSettings.decommissioningCandidates.at(areaCluster.second)
-                              .installedCapacity;
+        installedCapacity = area.decommissioningCandidates.at(areaCluster.second).installedCapacity;
     }
 
     tbb::parallel_for_each(
@@ -800,13 +783,12 @@ void ProblemGenerationForBalancing::applyActionToCluster(const AreaCluster& area
           {
           case CapacityAction::INVESTMENT:
           case CapacityAction::DISINVESTMENT:
-              oneWeekBoundsDataCandidate = areaSettings.investmentCandidates.at(areaCluster.second)
+              oneWeekBoundsDataCandidate = area.investmentCandidates.at(areaCluster.second)
                                              .boundsData[pbId];
               break;
           case CapacityAction::DECOMMISSIONING:
           case CapacityAction::RECOMMISSIONING:
-              oneWeekBoundsDataCandidate = areaSettings.decommissioningCandidates
-                                             .at(areaCluster.second)
+              oneWeekBoundsDataCandidate = area.decommissioningCandidates.at(areaCluster.second)
                                              .boundsData[pbId];
               break;
           }
@@ -839,7 +821,7 @@ void ProblemGenerationForBalancing::applyActionToCluster(const AreaCluster& area
       });
 }
 
-static double getCandidateCurrentCapacity(const std::map<std::string, AreaSettings>& areasSettings,
+static double getCandidateCurrentCapacity(const std::map<std::string, Area>& areas,
                                           const CapacityAction& action,
                                           const AreaCluster& areaCluster)
 {
@@ -848,13 +830,13 @@ static double getCandidateCurrentCapacity(const std::map<std::string, AreaSettin
     {
     case CapacityAction::INVESTMENT:
     case CapacityAction::DISINVESTMENT:
-        candidateCurrentCapacity = areasSettings.at(areaCluster.first)
+        candidateCurrentCapacity = areas.at(areaCluster.first)
                                      .investmentCandidates.at(areaCluster.second)
                                      .installedCapacity;
         break;
     case CapacityAction::DECOMMISSIONING:
     case CapacityAction::RECOMMISSIONING:
-        candidateCurrentCapacity = areasSettings.at(areaCluster.first)
+        candidateCurrentCapacity = areas.at(areaCluster.first)
                                      .decommissioningCandidates.at(areaCluster.second)
                                      .installedCapacity;
         break;
@@ -875,13 +857,13 @@ std::shared_ptr<ProblemManager> ProblemGenerationForBalancing::updateProblems(
     }
 
     // updating previous capacity
-    for (auto& [areaName, areaSettings]: areasSettings)
+    for (auto& [areaName, area]: areas)
     {
-        for (auto& candidate: areaSettings.investmentCandidates | std::views::values)
+        for (auto& candidate: area.investmentCandidates | std::views::values)
         {
             candidate.previousInstalledCapacity = candidate.installedCapacity;
         }
-        for (auto& candidate: areaSettings.decommissioningCandidates | std::views::values)
+        for (auto& candidate: area.decommissioningCandidates | std::views::values)
         {
             candidate.previousInstalledCapacity = candidate.installedCapacity;
         }
@@ -899,19 +881,15 @@ std::shared_ptr<ProblemManager> ProblemGenerationForBalancing::updateProblems(
     }
     for (const auto& [areaCluster, action]: areaClusterToModify)
     {
-        double previousCandidateCapacity = getCandidateCurrentCapacity(areasSettings,
-                                                                       action,
-                                                                       areaCluster);
+        double previousCandidateCapacity = getCandidateCurrentCapacity(areas, action, areaCluster);
         applyActionToCluster(areaCluster, action);
         updateRecords(areaCluster, action);
-        double newCandidateCapacity = getCandidateCurrentCapacity(areasSettings,
-                                                                  action,
-                                                                  areaCluster);
+        double newCandidateCapacity = getCandidateCurrentCapacity(areas, action, areaCluster);
         logger->display_message((std::stringstream()
                                  << " Area: " << areaCluster.first << " criteria: "
                                  << currentAreaCriteriaData[areaCluster.first].first << " ["
-                                 << lowerThreshold(areasSettings.at(areaCluster.first)) << "-"
-                                 << higherThreshold(areasSettings.at(areaCluster.first)) << "]"
+                                 << lowerThreshold(areas.at(areaCluster.first)) << "-"
+                                 << higherThreshold(areas.at(areaCluster.first)) << "]"
                                  << " action: " << to_string(action)
                                  << " cluster: " << areaCluster.second
                                  << " new capacity: " << newCandidateCapacity << " delta: "
@@ -942,10 +920,9 @@ bool ProblemGenerationForBalancing::isBlocked() const
 }
 
 /// @brief Intialize oscillation records
-/// @param areaSettings Data of the areas
 void ProblemGenerationForBalancing::initializeOscillationRecords()
 {
-    for (const auto& [areaName, areaSetting]: areasSettings)
+    for (const auto& [areaName, areaSetting]: areas)
     {
         for (const auto& [clusterName, investmentCandidate]: areaSetting.investmentCandidates)
         {
@@ -982,7 +959,7 @@ bool ProblemGenerationForBalancing::maxOscillationReached(const std::string& are
     for (const auto& [areaCluster, oscillationStatus]: oscillationRecords)
     {
         if (areaCluster.first == areaName
-            && oscillationStatus.first >= areasSettings[areaName].maxOscillation)
+            && oscillationStatus.first >= areas[areaName].maxOscillation)
         {
             maxOscillationReached = true;
             continue;

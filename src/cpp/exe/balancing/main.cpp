@@ -108,7 +108,7 @@ int main(int argc, char** argv)
                                                                directories.simulation_dir
                                                                  / "initial_problems");
         ProblemGenerationForBalancing pbg(directories,
-                                          balParser.areaSettings,
+                                          balParser.areas,
                                           logger,
                                           problemManager,
                                           iterationsLogFilePath);
@@ -140,7 +140,7 @@ int main(int argc, char** argv)
             auto updatedProblemsManager = pbg.updateProblems(res);
 
             res = GreedyBalancingFinder(logger,
-                                        balParser.areaSettings,
+                                        balParser.areas,
                                         balParser.getReliabilityStandardIndicator(),
                                         updatedProblemsManager,
                                         solverName,

@@ -24,7 +24,7 @@ class GreedyBalancingFinder: public Evaluator
 {
 public:
     GreedyBalancingFinder(Logger logger,
-                          const std::map<std::string, AreaSettings>& areaSettings,
+                          const std::map<std::string, Area>& areas,
                           Benders::Criterion::Type criterion,
                           std::shared_ptr<ProblemManager> problemManager,
                           std::string solverName,
@@ -39,11 +39,10 @@ private:
     std::unique_ptr<Benders::Criterion::CriterionComputation> criterion_computation_;
     Output::ConcurrentInsertionMap<Antares::Solver::WeeklyProblemId, PbOutput> balancingResults;
 
-    Benders::Criterion::CriterionInputData buildPatterns(
-      Benders::Criterion::Type criterion,
-      const std::map<std::string, AreaSettings>& areaSettings);
+    Benders::Criterion::CriterionInputData buildPatterns(Benders::Criterion::Type criterion,
+                                                         const std::map<std::string, Area>& areas);
     std::vector<size_t> getAreaBalanceIndices(std::shared_ptr<Problem> subProblem);
-    const std::map<std::string, AreaSettings>& areaSettings;
+    const std::map<std::string, Area>& areas;
     void fillAreaCriterionValuesAndPrices(const std::vector<double>& criteria,
                                           const std::vector<double>& dualValuesCst,
                                           const std::vector<size_t>& cstIndices,

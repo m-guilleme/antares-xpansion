@@ -151,7 +151,7 @@ protected:
         logger->display_message("Generating problems...");
         auto problemManager = std::make_shared<ProblemManager>(solverName);
         ProblemGenerationForBalancing pbg(directories,
-                                          balParser.areaSettings,
+                                          balParser.areas,
                                           logger,
                                           problemManager,
                                           iterationsLogFilePath);
@@ -171,7 +171,7 @@ protected:
             auto updatedProblemsManager = pbg.updateProblems(res);
 
             res = GreedyBalancingFinder(logger,
-                                        balParser.areaSettings,
+                                        balParser.areas,
                                         balParser.getReliabilityStandardIndicator(),
                                         updatedProblemsManager,
                                         solverName,
