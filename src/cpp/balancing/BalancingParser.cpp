@@ -50,8 +50,8 @@ bool AreaSettings::isRecommissioningPossible() const
 /// @param pathToYamlConfigFile The path to the YAML configuration file
 BalancingParser::BalancingParser(const std::filesystem::path& pathToYamlConfigFile):
     pathToYamlConfigFile(pathToYamlConfigFile),
-    reliabilityStandardDeadBandUp(0.0),
-    reliabilityStandardDeadBandDown(0.0)
+    defaultReliabilityStandardDeadBandUp(0.0),
+    defaultReliabilityStandardDeadBandDown(0.0)
 {
     if (!pathToYamlConfigFile.empty())
     {
@@ -100,13 +100,14 @@ void BalancingParser::parseGlobalSettings()
 {
     if (config["reliability_standard_dead_band_up"])
     {
-        reliabilityStandardDeadBandUp = config["reliability_standard_dead_band_up"].as<double>();
+        defaultReliabilityStandardDeadBandUp = config["reliability_standard_dead_band_up"]
+                                                 .as<double>();
     }
 
     if (config["reliability_standard_dead_band_down"])
     {
-        reliabilityStandardDeadBandDown = config["reliability_standard_dead_band_down"]
-                                            .as<double>();
+        defaultReliabilityStandardDeadBandDown = config["reliability_standard_dead_band_down"]
+                                                   .as<double>();
     }
 
     if (config["reliability_standard_indicator"])
@@ -256,12 +257,12 @@ void BalancingParser::parseAreasSettings()
         area.reliabilityStandardDeadBandUp = areaData["reliability_standard_dead_band_up"]
                                                ? areaData["reliability_standard_dead_band_up"]
                                                    .as<double>()
-                                               : reliabilityStandardDeadBandUp;
+                                               : defaultReliabilityStandardDeadBandUp;
 
         area.reliabilityStandardDeadBandDown = areaData["reliability_standard_dead_band_down"]
                                                  ? areaData["reliability_standard_dead_band_down"]
                                                      .as<double>()
-                                                 : reliabilityStandardDeadBandDown;
+                                                 : defaultReliabilityStandardDeadBandDown;
 
         parseCandidatesToType(areaData,
                               "decommissioning_candidates_to_type",
@@ -279,20 +280,6 @@ void BalancingParser::parseAreasSettings()
 
         areaSettings[areaName] = std::move(area);
     }
-}
-
-/// @brief Get the reliability standard dead band up value
-/// @return The reliability standard dead band up value
-double BalancingParser::getReliabilityStandardDeadBandUp() const
-{
-    return reliabilityStandardDeadBandUp;
-}
-
-/// @brief Get the reliability standard dead band down value
-/// @return The reliability standard dead band down value
-double BalancingParser::getReliabilityStandardDeadBandDown() const
-{
-    return reliabilityStandardDeadBandDown;
 }
 
 /// @brief Get the reliability standard indicator

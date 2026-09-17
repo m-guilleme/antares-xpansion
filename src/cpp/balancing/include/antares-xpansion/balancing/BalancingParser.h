@@ -102,8 +102,6 @@ public:
 
     void parse();
 
-    double getReliabilityStandardDeadBandUp() const;
-    double getReliabilityStandardDeadBandDown() const;
     Benders::Criterion::Type getReliabilityStandardIndicator() const;
 
     std::map<std::string, AreaSettings> areaSettings;
@@ -112,8 +110,8 @@ private:
     std::filesystem::path pathToYamlConfigFile;
     YAML::Node config;
 
-    double reliabilityStandardDeadBandUp;
-    double reliabilityStandardDeadBandDown;
+    double defaultReliabilityStandardDeadBandUp;
+    double defaultReliabilityStandardDeadBandDown;
     Benders::Criterion::Type reliabilityStandardIndicator;
 
     std::map<std::string, std::shared_ptr<Decommissioning>> decommissioningCandidatesTypes;
