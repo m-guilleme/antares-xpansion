@@ -25,7 +25,7 @@ ProblemGenerationForBalancing::ProblemGenerationForBalancing(
     iterationsLogFileName(iterationsLogFileName)
 {
     fillDispProdVarIndicesAndMarginalCosts();
-    getInitialCapacitiesForCandidates();
+    setCapacitiesDataForCandidates();
     initializeOscillationRecords();
     initializeIterativeLogCSV();
 }
@@ -68,42 +68,70 @@ void ProblemGenerationForBalancing::fillDispProdVarIndicesAndMarginalCostsForAre
     }
 }
 
-void ProblemGenerationForBalancing::getInitialCapacitiesForCandidates()
+void ProblemGenerationForBalancing::setCapacityDataForOneCandidate(const std::string& areaName,
+                                                                   const std::string& clusterName,
+                                                                   auto& candidate)
 {
-    auto updateCapacity =
-      [&](const std::string& areaName, const std::string& clusterName, auto& candidate)
+    const auto& dispProdVarIndices = balancingData[{areaName, clusterName}].dispProdVarIndices;
+    double installedCapacity = 0.0;
+    for (const auto& pbId: problemManager->getProblemIds())
     {
-        const AreaCluster key{areaName, clusterName};
-        double upperBound;
-        double lowerBound;
-        const auto& dispProdVarIndices = balancingData[key].dispProdVarIndices;
-        problemManager->getFirstProblem()->get_ub(&upperBound,
-                                                  dispProdVarIndices[0],
-                                                  dispProdVarIndices[0]);
-        problemManager->getFirstProblem()->get_lb(&lowerBound,
-                                                  dispProdVarIndices[0],
-                                                  dispProdVarIndices[0]);
-        // if both bound are equal to 0.0 we set as upperonly
-        candidate.boundType = upperBound == lowerBound && upperBound != 0.0
-                                ? CandidateBoundType::FIXED
-                              : lowerBound > 0.0 ? CandidateBoundType::BOTH
-                                                 : CandidateBoundType::UPPERONLY;
-        candidate.boundGap = lowerBound > 0.0 ? upperBound - lowerBound : 0.0;
-        candidate.currentCapacity = upperBound;
-        candidate.initialCapacity = upperBound;
-        candidate.previousCapacity = upperBound;
+        std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
+        std::vector<BoundData> oneWeekBoundsData(NUMBER_OF_HOURS_PER_WEEK);
+        for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+        {
+            double upperBound;
+            double lowerBound;
+            problem->get_ub(&upperBound, dispProdVarIndices[hour], dispProdVarIndices[hour]);
+            problem->get_lb(&lowerBound, dispProdVarIndices[hour], dispProdVarIndices[hour]);
+            oneWeekBoundsData[hour].lowBoundRatioToUpBound = upperBound > 0.0
+                                                               ? lowerBound / upperBound
+                                                               : 0.0;
+            // if both bound are equal to 0.0 we set as upperonly
+            oneWeekBoundsData[hour].boundType = upperBound == lowerBound && upperBound != 0.0
+                                                  ? BoundType::FIXED
+                                                : lowerBound > 0.0 ? BoundType::BOTH
+                                                                   : BoundType::UPPERONLY;
+            oneWeekBoundsData[hour].upBoundRatioToInstalledCap = upperBound;
+            if (upperBound > installedCapacity)
+            {
+                installedCapacity = upperBound;
+            }
+        }
+        candidate.setOneWeekBoundsData(pbId, oneWeekBoundsData);
     };
+    for (auto& [pbId, oneWeekBoundData]: candidate.boundsData)
+    {
+        for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+        {
+            oneWeekBoundData[hour].upBoundRatioToInstalledCap = oneWeekBoundData[hour]
+                                                                      .upBoundRatioToInstalledCap
+                                                                    == installedCapacity
+                                                                  ? 1.
+                                                                : installedCapacity > 0.0
+                                                                  ? oneWeekBoundData[hour]
+                                                                        .upBoundRatioToInstalledCap
+                                                                      / installedCapacity
+                                                                  : 0.0;
+        }
+    }
+    candidate.installedCapacity = installedCapacity;
+    candidate.previousInstalledCapacity = installedCapacity;
+    candidate.initInstalledCapacity = installedCapacity;
+}
 
+void ProblemGenerationForBalancing::setCapacitiesDataForCandidates()
+{
     for (auto& [areaName, areaSetting]: areasSettings)
     {
         for (auto& [clusterName, candidate]: areaSetting.investmentCandidates)
         {
-            updateCapacity(areaName, clusterName, candidate);
+            setCapacityDataForOneCandidate(areaName, clusterName, candidate);
         }
 
         for (auto& [clusterName, candidate]: areaSetting.decommissioningCandidates)
         {
-            updateCapacity(areaName, clusterName, candidate);
+            setCapacityDataForOneCandidate(areaName, clusterName, candidate);
         }
     }
 }
@@ -219,7 +247,7 @@ void ProblemGenerationForBalancing::logCriterionAndAreaSettings(
         for (const auto& [clusterName, investmentCandidate]: areaSettings.investmentCandidates)
         {
             ss << "  Invested capacity for candidate cluster " << clusterName << ": "
-               << investmentCandidate.currentCapacity
+               << investmentCandidate.installedCapacity
                << " | oscillation : " << oscillationRecords.at({areaName, clusterName}).first
                << "\n";
         }
@@ -227,7 +255,7 @@ void ProblemGenerationForBalancing::logCriterionAndAreaSettings(
              areaSettings.decommissioningCandidates)
         {
             ss << "  Decommissioned capacity for candidate cluster " << clusterName << ": "
-               << decommissioningCandidate.currentCapacity
+               << decommissioningCandidate.installedCapacity
                << " | oscillation : " << oscillationRecords.at({areaName, clusterName}).first
                << "\n";
         }
@@ -267,14 +295,14 @@ void ProblemGenerationForBalancing::saveCriterionAndAreaSettingsToIterativeLogCS
     {
         // only writing the line if capacity has been modified, i.e. an action has been
         // performed
-        if (candidate.currentCapacity != candidate.previousCapacity)
+        if (candidate.installedCapacity != candidate.previousInstalledCapacity)
         {
             action = (lastActionForArea.find(areaName) != lastActionForArea.end())
                        ? to_string(lastActionForArea.at(areaName))
                        : "NO ACTION";
             file << iteration << "," << areaName << "," << to_string(criterionState) << ","
                  << action << "," << clusterName << ","
-                 << candidate.currentCapacity - candidate.previousCapacity << "\n";
+                 << candidate.installedCapacity - candidate.previousInstalledCapacity << "\n";
         }
     };
 
@@ -309,17 +337,19 @@ void ProblemGenerationForBalancing::saveClusterResultsToCSV(
         const auto& areaSettings = areasSettings.at(areaName);
         for (const auto& [clusterName, investmentCandidate]: areaSettings.investmentCandidates)
         {
-            file << areaName << "," << clusterName << "," << investmentCandidate.currentCapacity
-                 << "," << investmentCandidate.currentCapacity - investmentCandidate.initialCapacity
+            file << areaName << "," << clusterName << "," << investmentCandidate.installedCapacity
+                 << ","
+                 << investmentCandidate.installedCapacity
+                      - investmentCandidate.initInstalledCapacity
                  << "\n";
         }
         for (const auto& [clusterName, decommissioningCandidate]:
              areaSettings.decommissioningCandidates)
         {
             file << areaName << "," << clusterName << ","
-                 << decommissioningCandidate.currentCapacity << ","
-                 << decommissioningCandidate.currentCapacity
-                      - decommissioningCandidate.initialCapacity
+                 << decommissioningCandidate.installedCapacity << ","
+                 << decommissioningCandidate.installedCapacity
+                      - decommissioningCandidate.initInstalledCapacity
                  << "\n";
         }
     }
@@ -355,14 +385,14 @@ void ProblemGenerationForBalancing::saveCriterionAndAreaSettingsToCSV(
 
         for (const auto& [clusterName, investmentCandidate]: areaSettings.investmentCandidates)
         {
-            totalCapacityChange += investmentCandidate.currentCapacity
-                                   - investmentCandidate.initialCapacity;
+            totalCapacityChange += investmentCandidate.installedCapacity
+                                   - investmentCandidate.initInstalledCapacity;
         }
         for (const auto& [clusterName, decommissioningCandidate]:
              areaSettings.decommissioningCandidates)
         {
-            totalCapacityChange += decommissioningCandidate.currentCapacity
-                                   - decommissioningCandidate.initialCapacity;
+            totalCapacityChange += decommissioningCandidate.installedCapacity
+                                   - decommissioningCandidate.initInstalledCapacity;
         }
 
         file << areaName << "," << criteriaValue << "," << areaSettings.reliabilityStandard << ","
@@ -503,12 +533,12 @@ static double extraCost(const Candidate<CandidateType>& candidate)
 {
     if constexpr (std::is_same_v<CandidateType, Investment>)
     {
-        return candidate.currentCapacity
+        return candidate.installedCapacity
                * (candidate.params->investmentCost + candidate.params->fixedOmCosts);
     }
     else
     {
-        return candidate.currentCapacity
+        return candidate.installedCapacity
                * (candidate.params->decommissioningCost + candidate.params->fixedOmCosts);
     }
 }
@@ -527,12 +557,12 @@ std::map<std::string, double> ProblemGenerationForBalancing::computeRentabilityF
         if constexpr (std::is_same_v<CandidateType, Investment>)
         {
             if (action == CapacityAction::INVESTMENT
-                && candidate.currentCapacity == candidate.params->expansionPotential)
+                && candidate.installedCapacity == candidate.params->expansionPotential)
             {
                 continue;
             }
             else if (action == CapacityAction::DISINVESTMENT
-                     && candidate.currentCapacity == candidate.initialCapacity)
+                     && candidate.installedCapacity == candidate.initInstalledCapacity)
             {
                 continue;
             }
@@ -540,12 +570,12 @@ std::map<std::string, double> ProblemGenerationForBalancing::computeRentabilityF
         else
         {
             if (action == CapacityAction::DECOMMISSIONING
-                && candidate.currentCapacity == candidate.params->decommissioningPotential)
+                && candidate.installedCapacity == candidate.params->decommissioningPotential)
             {
                 continue;
             }
             else if (action == CapacityAction::RECOMMISSIONING
-                     && candidate.currentCapacity == candidate.initialCapacity)
+                     && candidate.installedCapacity == candidate.initInstalledCapacity)
             {
                 continue;
             }
@@ -698,51 +728,42 @@ void ProblemGenerationForBalancing::updateAreaCriteriaData(
     currentAreaCriteriaData = computeAreaCriteriaData(simuValues);
 }
 
-/// @brief Compute the new bound for a variable and update the candidate's current value
-/// @param problem The problem to get the current bound from
-/// @param varIndex The index of the variable
+/// @brief Compute the new candidate's installed capacity
 /// @param action The action to apply
 /// @param areaSettings The area investment data to update
 /// @param clusterName The name of the cluster to update
-/// @return The new bound value
-double ProblemGenerationForBalancing::computeNewBoundAndUpdateCandidate(
-  const std::shared_ptr<Problem>& problem,
-  size_t varIndex,
+void ProblemGenerationForBalancing::computeCandidateInstalledCapacity(
   CapacityAction action,
   AreaSettings& areaSettings,
-  const std::string& clusterName) const
+  const std::string& clusterName)
 {
-    double newBound;
     switch (action)
     {
     case CapacityAction::INVESTMENT:
-        problem->get_ub(&newBound, varIndex, varIndex);
-        newBound = std::min(
-          newBound + areaSettings.currentInvestmentIncrement,
+        areaSettings.investmentCandidates.at(clusterName).installedCapacity = std::min(
+          areaSettings.investmentCandidates.at(clusterName).installedCapacity
+            + areaSettings.currentInvestmentIncrement,
           areaSettings.investmentCandidates.at(clusterName).params->expansionPotential);
-        areaSettings.investmentCandidates.at(clusterName).currentCapacity = newBound;
         break;
     case CapacityAction::DISINVESTMENT:
-        problem->get_ub(&newBound, varIndex, varIndex);
-        newBound = std::max(newBound - areaSettings.currentInvestmentIncrement,
-                            areaSettings.investmentCandidates.at(clusterName).initialCapacity);
-        areaSettings.investmentCandidates.at(clusterName).currentCapacity = newBound;
+        areaSettings.investmentCandidates.at(clusterName).installedCapacity = std::max(
+          areaSettings.investmentCandidates.at(clusterName).installedCapacity
+            - areaSettings.currentInvestmentIncrement,
+          areaSettings.investmentCandidates.at(clusterName).initInstalledCapacity);
         break;
     case CapacityAction::DECOMMISSIONING:
-        problem->get_ub(&newBound, varIndex, varIndex);
-        newBound = std::max(
-          newBound - areaSettings.currentDecommissioningIncrement,
+        areaSettings.decommissioningCandidates.at(clusterName).installedCapacity = std::max(
+          areaSettings.decommissioningCandidates.at(clusterName).installedCapacity
+            - areaSettings.currentDecommissioningIncrement,
           areaSettings.decommissioningCandidates.at(clusterName).params->decommissioningPotential);
-        areaSettings.decommissioningCandidates.at(clusterName).currentCapacity = newBound;
         break;
     case CapacityAction::RECOMMISSIONING:
-        problem->get_ub(&newBound, varIndex, varIndex);
-        newBound = std::min(newBound + areaSettings.currentDecommissioningIncrement,
-                            areaSettings.decommissioningCandidates.at(clusterName).initialCapacity);
-        areaSettings.decommissioningCandidates.at(clusterName).currentCapacity = newBound;
+        areaSettings.decommissioningCandidates.at(clusterName).installedCapacity = std::min(
+          areaSettings.decommissioningCandidates.at(clusterName).installedCapacity
+            + areaSettings.currentDecommissioningIncrement,
+          areaSettings.decommissioningCandidates.at(clusterName).initInstalledCapacity);
         break;
     }
-    return newBound;
 }
 
 /// @brief Apply the action for each area cluster to the problems
@@ -752,53 +773,68 @@ void ProblemGenerationForBalancing::applyActionToCluster(const AreaCluster& area
                                                          CapacityAction action)
 {
     lastActionForArea[areaCluster.first] = action;
+
     const auto& varIndices = balancingData.at(areaCluster).dispProdVarIndices;
-    auto& areaSettings = areasSettings.at(areaCluster.first);
     std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
 
-    double boundGap;
-    CandidateBoundType boundType;
-    switch (action)
+    auto& areaSettings = areasSettings.at(areaCluster.first);
+    computeCandidateInstalledCapacity(action, areaSettings, areaCluster.second);
+    double installedCapacity;
+    if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
     {
-    case CapacityAction::INVESTMENT:
-    case CapacityAction::DISINVESTMENT:
-        boundGap = areaSettings.investmentCandidates.at(areaCluster.second).boundGap;
-        boundType = areaSettings.investmentCandidates.at(areaCluster.second).boundType;
-        break;
-    case CapacityAction::DECOMMISSIONING:
-    case CapacityAction::RECOMMISSIONING:
-        boundGap = areaSettings.decommissioningCandidates.at(areaCluster.second).boundGap;
-        boundType = areaSettings.decommissioningCandidates.at(areaCluster.second).boundType;
-        break;
+        installedCapacity = areaSettings.investmentCandidates.at(areaCluster.second)
+                              .installedCapacity;
     }
-    std::vector<char> boundU(NUMBER_OF_HOURS_PER_WEEK,
-                             boundType == CandidateBoundType::FIXED ? 'B' : 'U');
+    else
+    {
+        installedCapacity = areaSettings.decommissioningCandidates.at(areaCluster.second)
+                              .installedCapacity;
+    }
 
     tbb::parallel_for_each(
       problemManager->getProblemIds(),
       [&](const auto& pbId)
       {
+          std::vector<BoundData> oneWeekBoundsDataCandidate;
+          switch (action)
+          {
+          case CapacityAction::INVESTMENT:
+          case CapacityAction::DISINVESTMENT:
+              oneWeekBoundsDataCandidate = areaSettings.investmentCandidates.at(areaCluster.second)
+                                             .boundsData[pbId];
+              break;
+          case CapacityAction::DECOMMISSIONING:
+          case CapacityAction::RECOMMISSIONING:
+              oneWeekBoundsDataCandidate = areaSettings.decommissioningCandidates
+                                             .at(areaCluster.second)
+                                             .boundsData[pbId];
+              break;
+          }
           std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
-          std::vector<double> localVarValues(NUMBER_OF_HOURS_PER_WEEK);
+          std::vector<char> vecUpperChar(NUMBER_OF_HOURS_PER_WEEK, 'U');
+          std::vector<char> vecLowerChar(NUMBER_OF_HOURS_PER_WEEK, 'L');
+          std::vector<double> upperBoundsValue(NUMBER_OF_HOURS_PER_WEEK);
+          std::vector<double> lowerBoundsValue(NUMBER_OF_HOURS_PER_WEEK);
           for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
           {
-              localVarValues[hour] = computeNewBoundAndUpdateCandidate(problem,
-                                                                       varIndices[hour],
-                                                                       action,
-                                                                       areaSettings,
-                                                                       areaCluster.second);
+              double upperValue = oneWeekBoundsDataCandidate[hour].upBoundRatioToInstalledCap
+                                  * installedCapacity;
+              upperBoundsValue[hour] = upperValue;
+              switch (oneWeekBoundsDataCandidate[hour].boundType)
+              {
+              case BoundType::FIXED:
+                  lowerBoundsValue[hour] = upperValue;
+                  break;
+              case BoundType::BOTH:
+                  lowerBoundsValue[hour] = oneWeekBoundsDataCandidate[hour].lowBoundRatioToUpBound
+                                           * upperValue;
+                  break;
+              default:
+                  lowerBoundsValue[hour] = 0.0;
+              }
           }
-          problem->chg_bounds(vecIndices, boundU, localVarValues);
-          if (boundType == CandidateBoundType::BOTH)
-          {
-              std::vector<char> boundL(NUMBER_OF_HOURS_PER_WEEK, 'L');
-              std::transform(localVarValues.begin(),
-                             localVarValues.end(),
-                             localVarValues.begin(),
-                             [boundGap](double x)
-                             { return x - boundGap > 0.0 ? x - boundGap : 0.0; });
-              problem->chg_bounds(vecIndices, boundL, localVarValues);
-          }
+          problem->chg_bounds(vecIndices, vecUpperChar, upperBoundsValue);
+          problem->chg_bounds(vecIndices, vecLowerChar, lowerBoundsValue);
           problemManager->setProblem(pbId, problem);
       });
 }
@@ -814,13 +850,13 @@ static double getCandidateCurrentCapacity(const std::map<std::string, AreaSettin
     case CapacityAction::DISINVESTMENT:
         candidateCurrentCapacity = areasSettings.at(areaCluster.first)
                                      .investmentCandidates.at(areaCluster.second)
-                                     .currentCapacity;
+                                     .installedCapacity;
         break;
     case CapacityAction::DECOMMISSIONING:
     case CapacityAction::RECOMMISSIONING:
         candidateCurrentCapacity = areasSettings.at(areaCluster.first)
                                      .decommissioningCandidates.at(areaCluster.second)
-                                     .currentCapacity;
+                                     .installedCapacity;
         break;
     }
     return candidateCurrentCapacity;
@@ -843,11 +879,11 @@ std::shared_ptr<ProblemManager> ProblemGenerationForBalancing::updateProblems(
     {
         for (auto& candidate: areaSettings.investmentCandidates | std::views::values)
         {
-            candidate.previousCapacity = candidate.currentCapacity;
+            candidate.previousInstalledCapacity = candidate.installedCapacity;
         }
         for (auto& candidate: areaSettings.decommissioningCandidates | std::views::values)
         {
-            candidate.previousCapacity = candidate.currentCapacity;
+            candidate.previousInstalledCapacity = candidate.installedCapacity;
         }
     }
 

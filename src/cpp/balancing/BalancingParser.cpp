@@ -8,7 +8,7 @@ bool AreaSettings::isInvestmentPossible() const
 {
     return std::ranges::any_of(investmentCandidates,
                                [](const auto& entry) {
-                                   return entry.second.currentCapacity
+                                   return entry.second.installedCapacity
                                           < entry.second.params->expansionPotential;
                                });
 }
@@ -19,7 +19,7 @@ bool AreaSettings::isDecommissioningPossible() const
 {
     return std::ranges::any_of(decommissioningCandidates,
                                [](const auto& entry) {
-                                   return entry.second.currentCapacity
+                                   return entry.second.installedCapacity
                                           > entry.second.params->decommissioningPotential;
                                });
 }
@@ -30,8 +30,8 @@ bool AreaSettings::isDisinvestmentPossible() const
 {
     return std::ranges::any_of(investmentCandidates,
                                [](const auto& entry) {
-                                   return entry.second.currentCapacity
-                                          > entry.second.initialCapacity;
+                                   return entry.second.installedCapacity
+                                          > entry.second.initInstalledCapacity;
                                });
 }
 
@@ -41,8 +41,8 @@ bool AreaSettings::isRecommissioningPossible() const
 {
     return std::ranges::any_of(decommissioningCandidates,
                                [](const auto& entry) {
-                                   return entry.second.currentCapacity
-                                          < entry.second.initialCapacity;
+                                   return entry.second.installedCapacity
+                                          < entry.second.initInstalledCapacity;
                                });
 }
 

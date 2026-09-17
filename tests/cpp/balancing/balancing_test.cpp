@@ -86,17 +86,21 @@ protected:
           "data_test/balancing/find_area_cluster_to_modify/input_balancing.yml");
         BalancingParser balParser(balancingConfigFilePath);
         pbg.areasSettings = balParser.areaSettings;
-        pbg.areasSettings["desinvest_area"].investmentCandidates["candidate_1"].currentCapacity
+        pbg.areasSettings["desinvest_area"].investmentCandidates["candidate_1"].installedCapacity
           = 1000;
-        pbg.areasSettings["desinvest_area"].investmentCandidates["candidate_2"].currentCapacity
+        pbg.areasSettings["desinvest_area"].investmentCandidates["candidate_2"].installedCapacity
           = 1000;
-        pbg.areasSettings["decom_area"].decommissioningCandidates["candidate_1"].currentCapacity
+        pbg.areasSettings["decom_area"].decommissioningCandidates["candidate_1"].installedCapacity
           = 1000;
-        pbg.areasSettings["decom_area"].decommissioningCandidates["candidate_2"].currentCapacity
+        pbg.areasSettings["decom_area"].decommissioningCandidates["candidate_2"].installedCapacity
           = 1000;
-        pbg.areasSettings["recom_area"].decommissioningCandidates["candidate_1"].initialCapacity
+        pbg.areasSettings["recom_area"]
+          .decommissioningCandidates["candidate_1"]
+          .initInstalledCapacity
           = 1000;
-        pbg.areasSettings["recom_area"].decommissioningCandidates["candidate_2"].initialCapacity
+        pbg.areasSettings["recom_area"]
+          .decommissioningCandidates["candidate_2"]
+          .initInstalledCapacity
           = 1000;
         // set pbg.lastActionForArea
         std::map<std::string, CapacityAction> lastActionForArea = {
@@ -210,8 +214,9 @@ protected:
                                   const std::string& candidateName,
                                   const CapacityAction& action,
                                   const double capacityIncrement,
-                                  const double boundGap,
-                                  const CandidateBoundType boundType,
+                                  const double uBoundRatioToInstCap,
+                                  const double lBoundRatioToUpBound,
+                                  const BoundType boundType,
                                   const double expectedUpperCapacity,
                                   const double expectedLowerCapacity)
     {
@@ -240,45 +245,53 @@ protected:
         pbg.areasSettings[areaName].currentInvestmentIncrement = capacityIncrement;
         if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
         {
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].initialCapacity
-              = 4 * capacityIncrement; // we set initialCapacity lower to allowed disinvestment
+            pbg.areasSettings[areaName].investmentCandidates[candidateName].initInstalledCapacity
+              = 4 * capacityIncrement; // we set initInstalledCapacity lower to allow disinvestment
             pbg.areasSettings[areaName].currentInvestmentIncrement = capacityIncrement;
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].boundGap = boundGap;
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].boundType = boundType;
-            multForUpperBoundLocation = 6;
+            pbg.areasSettings[areaName].investmentCandidates[candidateName].installedCapacity
+              = 6 * capacityIncrement;
+            for (const auto& pbId: problemManager->getProblemIds())
+            {
+                std::vector<BoundData> oneWeekBoundData(NUMBER_OF_HOURS_PER_WEEK);
+                for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+                {
+                    oneWeekBoundData[hour].lowBoundRatioToUpBound = lBoundRatioToUpBound;
+                    oneWeekBoundData[hour].boundType = boundType;
+                    oneWeekBoundData[hour].upBoundRatioToInstalledCap = uBoundRatioToInstCap;
+                }
+                pbg.areasSettings[areaName]
+                  .investmentCandidates[candidateName]
+                  .setOneWeekBoundsData(pbId, oneWeekBoundData);
+            }
         }
         else
         {
-            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].initialCapacity
-              = 4 * capacityIncrement; // we set initialCapacity higher to allowed recom
+            pbg.areasSettings[areaName]
+              .decommissioningCandidates[candidateName]
+              .initInstalledCapacity
+              = 4 * capacityIncrement; // we set initInstalledCapacity higher to allow recom
             pbg.areasSettings[areaName].currentDecommissioningIncrement = capacityIncrement;
-            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].boundGap
-              = boundGap;
-            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].boundType
-              = boundType;
-            multForUpperBoundLocation = 2;
+            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].installedCapacity
+              = 2 * capacityIncrement;
+            for (const auto& pbId: problemManager->getProblemIds())
+            {
+                std::vector<BoundData> oneWeekBoundsData(NUMBER_OF_HOURS_PER_WEEK);
+                for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+                {
+                    oneWeekBoundsData[hour].lowBoundRatioToUpBound = lBoundRatioToUpBound;
+                    oneWeekBoundsData[hour].boundType = boundType;
+                    oneWeekBoundsData[hour].upBoundRatioToInstalledCap = uBoundRatioToInstCap;
+                }
+                pbg.areasSettings[areaName]
+                  .decommissioningCandidates[candidateName]
+                  .setOneWeekBoundsData(pbId, oneWeekBoundsData);
+            }
         }
 
         const auto& varIndices = pbg.balancingData.at({areaName, candidateName}).dispProdVarIndices;
         auto& areaSettings = pbg.areasSettings.at(areaName);
         std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
-        double upperBoundSet = multForUpperBoundLocation * capacityIncrement;
-        double lowerBoundSet = boundType == CandidateBoundType::UPPERONLY
-                                 ? 0.0
-                                 : multForUpperBoundLocation * capacityIncrement - boundGap;
-        std::vector<double> upperValues(NUMBER_OF_HOURS_PER_WEEK, upperBoundSet);
-        std::vector<double> lowerValues(NUMBER_OF_HOURS_PER_WEEK, lowerBoundSet);
-        std::vector<char> boundU(NUMBER_OF_HOURS_PER_WEEK, 'U');
-        std::vector<char> boundL(NUMBER_OF_HOURS_PER_WEEK, 'L');
 
-        for (const auto& pbId: problemManager->getProblemIds())
-        {
-            std::shared_ptr<Problem> problem = pbg.problemManager->getProblemFromId(pbId);
-            problem->chg_bounds(vecIndices, boundU, upperValues);
-            problem->chg_bounds(vecIndices, boundL, lowerValues);
-        }
-        // assert bounds before action
-        assertCandidateBounds(pbg.problemManager, vecIndices, upperBoundSet, lowerBoundSet);
         // run applyActionToCluster
         pbg.applyActionToCluster({areaName, candidateName}, action);
         // assert results
@@ -294,7 +307,7 @@ protected:
                                              const double investmentCost,
                                              const double fixedOmCosts,
                                              const double marginalCost,
-                                             const double currentCapacity,
+                                             const double installedCapacity,
                                              const CapacityAction& action,
                                              const double expectedRentability)
     {
@@ -330,8 +343,8 @@ protected:
         // set investment cost and fixed om cost
         if (action == CapacityAction::INVESTMENT)
         {
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].currentCapacity
-              = currentCapacity;
+            pbg.areasSettings[areaName].investmentCandidates[candidateName].installedCapacity
+              = installedCapacity;
             pbg.areasSettings[areaName].investmentCandidates[candidateName].params->investmentCost
               = investmentCost;
             pbg.areasSettings[areaName].investmentCandidates[candidateName].params->fixedOmCosts
@@ -339,8 +352,8 @@ protected:
         }
         else
         {
-            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].currentCapacity
-              = currentCapacity;
+            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].installedCapacity
+              = installedCapacity;
             pbg.areasSettings[areaName]
               .decommissioningCandidates[candidateName]
               .params->decommissioningCost
@@ -429,9 +442,9 @@ protected:
         std::map<std::string, double> rentability;
         if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
         {
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].currentCapacity
+            pbg.areasSettings[areaName].investmentCandidates[candidateName].installedCapacity
               = capacityValue;
-            pbg.areasSettings[areaName].investmentCandidates[candidateName].initialCapacity
+            pbg.areasSettings[areaName].investmentCandidates[candidateName].initInstalledCapacity
               = capacityValue;
             pbg.areasSettings[areaName]
               .investmentCandidates[candidateName]
@@ -445,9 +458,11 @@ protected:
         }
         else
         {
-            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].currentCapacity
+            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].installedCapacity
               = capacityValue;
-            pbg.areasSettings[areaName].decommissioningCandidates[candidateName].initialCapacity
+            pbg.areasSettings[areaName]
+              .decommissioningCandidates[candidateName]
+              .initInstalledCapacity
               = capacityValue;
             pbg.areasSettings[areaName]
               .decommissioningCandidates[candidateName]
@@ -464,7 +479,7 @@ protected:
         EXPECT_TRUE(rentability.empty());
     }
 
-    void testDetermineCapacityAction(const double initialCapacity,
+    void testDetermineCapacityAction(const double initInstalledCapacity,
                                      const double expansionPotential,
                                      const double decommissioningPotential,
                                      const CriterionState& criterionState,
@@ -492,14 +507,16 @@ protected:
                                                                           problemManager,
                                                                           iterLogFilePath);
         // set pbg.areaSettings
-        pbg.areasSettings["area2"].investmentCandidates["invest_semibase"].initialCapacity
-          = initialCapacity;
+        pbg.areasSettings["area2"].investmentCandidates["invest_semibase"].initInstalledCapacity
+          = initInstalledCapacity;
         pbg.areasSettings["area2"]
           .investmentCandidates["invest_semibase"]
           .params->expansionPotential
           = expansionPotential;
-        pbg.areasSettings["area2"].decommissioningCandidates["unprofitable_peak"].initialCapacity
-          = initialCapacity;
+        pbg.areasSettings["area2"]
+          .decommissioningCandidates["unprofitable_peak"]
+          .initInstalledCapacity
+          = initInstalledCapacity;
         pbg.areasSettings["area2"]
           .decommissioningCandidates["unprofitable_peak"]
           .params->decommissioningPotential
@@ -532,8 +549,9 @@ TEST_F(BalancingTest, applyInvestmentActionToClusterWithUpperonlyBound)
                              "invest_semibase",
                              CapacityAction::INVESTMENT,
                              500,
+                             1.0,
                              0.0,
-                             CandidateBoundType::UPPERONLY,
+                             BoundType::UPPERONLY,
                              3500,
                              0.0);
     logger->display_message(
@@ -547,10 +565,11 @@ TEST_F(BalancingTest, applyInvestmentActionToClusterWithBothBound)
                              "invest_semibase",
                              CapacityAction::INVESTMENT,
                              500,
-                             200,
-                             CandidateBoundType::BOTH,
+                             1.0,
+                             0.9,
+                             BoundType::BOTH,
                              3500,
-                             3300);
+                             3150);
     logger->display_message("Test of applyActionToCluster with INVESTMENT and Both bound done!");
 }
 
@@ -561,8 +580,9 @@ TEST_F(BalancingTest, applyInvestmentActionToClusterWithFixedBound)
                              "invest_semibase",
                              CapacityAction::INVESTMENT,
                              500,
+                             1.0,
                              0.0,
-                             CandidateBoundType::FIXED,
+                             BoundType::FIXED,
                              3500,
                              3500);
     logger->display_message("Test of applyActionToCluster with INVESTMENT and Fixed bound done!");
@@ -575,10 +595,11 @@ TEST_F(BalancingTest, applyDisinvestmentActionToCluster)
                              "invest_semibase",
                              CapacityAction::DISINVESTMENT,
                              500,
-                             200,
-                             CandidateBoundType::BOTH,
+                             1.0,
+                             0.9,
+                             BoundType::BOTH,
                              2500,
-                             2300);
+                             2250);
     logger->display_message("Test of applyActionToCluster with DISINVESTMENT done!");
 }
 
@@ -589,10 +610,11 @@ TEST_F(BalancingTest, applyDecomActionToCluster)
                              "unprofitable_peak",
                              CapacityAction::DECOMMISSIONING,
                              500,
-                             200,
-                             CandidateBoundType::BOTH,
+                             1.0,
+                             0.9,
+                             BoundType::BOTH,
                              500,
-                             300);
+                             450);
     logger->display_message("Test of applyActionToCluster with DECOM done!");
 }
 
@@ -603,10 +625,11 @@ TEST_F(BalancingTest, applyRecomActionToCluster)
                              "unprofitable_peak",
                              CapacityAction::RECOMMISSIONING,
                              500,
-                             200,
-                             CandidateBoundType::BOTH,
+                             1.0,
+                             0.9,
+                             BoundType::BOTH,
                              1500,
-                             1300);
+                             1350);
     logger->display_message("Test of applyActionToCluster with RECOM done!");
 }
 

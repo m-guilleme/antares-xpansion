@@ -87,7 +87,10 @@ private:
 
     void initializeIterativeLogCSV() const;
     void fillDispProdVarIndicesAndMarginalCosts();
-    void getInitialCapacitiesForCandidates();
+    void setCapacityDataForOneCandidate(const std::string& areaName,
+                                        const std::string& clusterName,
+                                        auto& candidate);
+    void setCapacitiesDataForCandidates();
     void initializeOscillationRecords();
     bool maxOscillationReached(const std::string& areaName) const;
     void updateRecords(const AreaCluster& areaCluster, CapacityAction action);
@@ -118,10 +121,8 @@ private:
       const std::string& clusterName,
       const std::unordered_map<std::string, size_t>& varToIndex,
       const std::vector<double>& objCoeffs);
-    double computeNewBoundAndUpdateCandidate(const std::shared_ptr<Problem>& problem,
-                                             size_t varIndex,
-                                             CapacityAction action,
-                                             AreaSettings& areaSettings,
-                                             const std::string& clusterName) const;
+    void computeCandidateInstalledCapacity(CapacityAction action,
+                                           AreaSettings& areaSettings,
+                                           const std::string& clusterName);
     friend class BalancingTest;
 };

@@ -4,7 +4,10 @@
 #include <memory>
 #include <string>
 
+#include <antares/api/solver.h>
+
 #include "antares-xpansion/benders/benders_core/CriterionInputDataReader.h"
+
 enum class CriterionState
 {
     LOWER,
@@ -13,7 +16,7 @@ enum class CriterionState
     UNINITIALIZED,
 };
 
-enum class CandidateBoundType
+enum class BoundType
 {
     UPPERONLY,
     FIXED,
@@ -50,15 +53,26 @@ struct Decommissioning
     double fixedOmCosts;
 };
 
+struct BoundData
+{
+    double upBoundRatioToInstalledCap, lowBoundRatioToUpBound;
+    BoundType boundType;
+};
+
 template<typename Type>
 struct Candidate
 {
     std::shared_ptr<Type> params;
-    double currentCapacity;
-    double previousCapacity;
-    double initialCapacity;
-    double boundGap;
-    CandidateBoundType boundType;
+    double installedCapacity;
+    double previousInstalledCapacity;
+    double initInstalledCapacity;
+    std::map<Antares::Solver::WeeklyProblemId, std::vector<BoundData>> boundsData;
+
+    void setOneWeekBoundsData(Antares::Solver::WeeklyProblemId pbId,
+                              std::vector<BoundData> oneWeekBoundsData)
+    {
+        boundsData[pbId] = oneWeekBoundsData;
+    }
 };
 
 struct AreaSettings
