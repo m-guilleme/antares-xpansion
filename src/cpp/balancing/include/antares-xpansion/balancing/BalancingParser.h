@@ -51,10 +51,10 @@ struct BoundData
     double upBoundRatioToInstalledCap, lowBoundRatioToUpBound;
 };
 
-template<typename Type>
+template<typename T>
 struct Candidate
 {
-    std::shared_ptr<Type> type;
+    std::shared_ptr<T> type;
     double installedCapacity;
     double previousInstalledCapacity;
     double initInstalledCapacity;

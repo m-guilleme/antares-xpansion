@@ -110,10 +110,10 @@ private:
     std::optional<CapacityAction> determineCapacityAction(const std::string& areaName,
                                                           CriterionState currentState,
                                                           const Area& area) const;
-    template<typename CandidateType>
+    template<typename T>
     std::map<std::string, double> computeRentabilityForCandidates(
       const std::string& areaName,
-      const std::map<std::string, Candidate<CandidateType>>& candidates,
+      const std::map<std::string, Candidate<T>>& candidates,
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues,
       CapacityAction action) const;
     void fillDispProdVarIndicesAndMarginalCostsForArea(

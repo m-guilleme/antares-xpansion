@@ -510,10 +510,10 @@ std::optional<CapacityAction> ProblemGenerationForBalancing::determineCapacityAc
     return std::nullopt;
 }
 
-template<typename Type>
-static double extraCost(const Candidate<Type>& candidate)
+template<typename T>
+static double extraCost(const Candidate<T>& candidate)
 {
-    if constexpr (std::is_same_v<Type, InvestmentCandidateType>)
+    if constexpr (std::is_same_v<T, InvestmentCandidateType>)
     {
         return candidate.installedCapacity
                * (candidate.type->investmentCost + candidate.type->fixedOmCosts);
@@ -525,10 +525,10 @@ static double extraCost(const Candidate<Type>& candidate)
     }
 }
 
-template<typename Type>
+template<typename T>
 std::map<std::string, double> ProblemGenerationForBalancing::computeRentabilityForCandidates(
   const std::string& areaName,
-  const std::map<std::string, Candidate<Type>>& candidates,
+  const std::map<std::string, Candidate<T>>& candidates,
   const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues,
   CapacityAction action) const
 {
@@ -536,7 +536,7 @@ std::map<std::string, double> ProblemGenerationForBalancing::computeRentabilityF
     for (const auto& [clusterName, candidate]: candidates)
     {
         double value = 0.0;
-        if constexpr (std::is_same_v<Type, InvestmentCandidateType>)
+        if constexpr (std::is_same_v<T, InvestmentCandidateType>)
         {
             if (action == CapacityAction::INVESTMENT
                 && candidate.installedCapacity == candidate.type->expansionPotential)
