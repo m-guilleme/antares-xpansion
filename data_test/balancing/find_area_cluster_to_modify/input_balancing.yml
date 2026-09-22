@@ -1,6 +1,6 @@
 reliability_standard_dead_band_up: 0.5
 reliability_standard_dead_band_down: 0.5
-reliability_standard_indicator: LOLE # Or LOLE
+reliability_standard_indicator: LOLE # Or NPCAP_HOURS Or UNSP_ENERG
 
 areas:
   invest_area:

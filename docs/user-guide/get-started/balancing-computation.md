@@ -25,7 +25,7 @@ reliability_standard_dead_band_up: 0.5
 # reliabilty standard use to compute the lower bound of the balancing criteria
 reliability_standard_dead_band_down: 0.5
 # which reliability standard indicator to use
-reliability_standard_indicator: LOLE # Or NPCAP_HOURS
+reliability_standard_indicator: LOLE # Or NPCAP_HOURS Or UNSP_ENERG
 
 # Parameters dedicated to each area
 areas:
