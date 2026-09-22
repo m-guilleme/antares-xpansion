@@ -7,8 +7,9 @@
 #include <tbb/parallel_for_each.h>
 #include <unordered_set>
 
-#include "antares-xpansion/benders/benders_core/CriterionLOL.h"
+#include "antares-xpansion/benders/benders_core/CriterionLOLE.h"
 #include "antares-xpansion/benders/benders_core/CriterionNPCAP.h"
+#include "antares-xpansion/benders/benders_core/CriterionUNSPENERG.h"
 #include "antares-xpansion/helpers/Timer.h"
 
 using namespace PlainData;
@@ -182,8 +183,13 @@ void GreedyBalancingFinder::setCriterionComputationInputs(
 
     switch (criterion_input_data.criterion)
     {
+    case LossOfLoadExpectation:
+        criterion_computation_ = std::make_unique<Benders::Criterion::CriterionLOLE>(
+          criterion_input_data,
+          problem);
+        break;
     case UnsuppliedEnergy:
-        criterion_computation_ = std::make_unique<Benders::Criterion::CriterionLOL>(
+        criterion_computation_ = std::make_unique<Benders::Criterion::CriterionUNSPENERG>(
           criterion_input_data,
           problem);
         break;

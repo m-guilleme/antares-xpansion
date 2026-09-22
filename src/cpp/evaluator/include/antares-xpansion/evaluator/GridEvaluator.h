@@ -5,8 +5,9 @@
 #include <antares/solver/lps/LpsFromAntares.h>
 
 #include "antares-xpansion/benders/benders_core/CriterionComputation.h"
-#include "antares-xpansion/benders/benders_core/CriterionLOL.h"
+#include "antares-xpansion/benders/benders_core/CriterionLOLE.h"
 #include "antares-xpansion/benders/benders_core/CriterionNPCAP.h"
+#include "antares-xpansion/benders/benders_core/CriterionUNSPENERG.h"
 #include "antares-xpansion/benders/benders_core/SubproblemWorker.h"
 #include "antares-xpansion/benders/output/JsonWriter.h"
 #include "antares-xpansion/evaluator/Evaluator.h"

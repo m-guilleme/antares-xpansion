@@ -11,6 +11,7 @@ namespace Benders::Criterion
 enum class Type
 {
     UnsuppliedEnergy,
+    LossOfLoadExpectation,
     NearPriceCapHours,
 };
 
@@ -19,6 +20,7 @@ constexpr std::string_view getPrefix(Type t)
     switch (t)
     {
     case Type::UnsuppliedEnergy:
+    case Type::LossOfLoadExpectation:
         return "UnsuppliedEnergy::";
     case Type::NearPriceCapHours:
         return "AreaBalance::";

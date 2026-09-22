@@ -1,24 +1,24 @@
-#include "antares-xpansion/benders/benders_core/CriterionLOL.h"
+#include "antares-xpansion/benders/benders_core/CriterionUNSPENERG.h"
 
 namespace Benders::Criterion
 {
-CriterionLOL::CriterionLOL(const CriterionInputData& criterion_input_data):
+CriterionUNSPENERG::CriterionUNSPENERG(const CriterionInputData& criterion_input_data):
     CriterionComputation(criterion_input_data)
 {
 }
 
-CriterionLOL::CriterionLOL(const CriterionInputData& criterion_input_data,
-                           std::shared_ptr<SolverAbstract> problem):
+CriterionUNSPENERG::CriterionUNSPENERG(const CriterionInputData& criterion_input_data,
+                                       std::shared_ptr<SolverAbstract> problem):
     CriterionComputation(criterion_input_data)
 {
     const auto col_names = problem->get_col_names();
     SearchVariables(col_names);
 }
 
-void CriterionLOL::ComputeCriterion(std::shared_ptr<SolverAbstract> problem,
-                                    double subproblem_weight,
-                                    std::vector<double>& criteria,
-                                    std::vector<double>& patterns_values)
+void CriterionUNSPENERG::ComputeCriterion(std::shared_ptr<SolverAbstract> problem,
+                                          double subproblem_weight,
+                                          std::vector<double>& criteria,
+                                          std::vector<double>& patterns_values)
 {
     // this check still exists in case a problem hasn't been passed to the constructor
     if (indices_.empty())
@@ -45,11 +45,7 @@ void CriterionLOL::ComputeCriterion(std::shared_ptr<SolverAbstract> problem,
         {
             const auto solution = varValues[index];
             pattern_value += solution;
-            if (solution > criterion_count_threshold)
-            {
-                // 1h were criterion is satisfied
-                criteria_value += subproblem_weight;
-            }
+            criteria_value += solution * subproblem_weight;
         }
         patterns_values[pattern_index] = pattern_value;
         criteria[pattern_index] = criteria_value;

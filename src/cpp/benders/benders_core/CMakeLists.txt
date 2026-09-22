@@ -27,7 +27,8 @@ target_sources(benders_core PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/WorkerMaster.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/common.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/CriterionComputation.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/CriterionLOL.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/CriterionLOLE.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/CriterionUNSPENERG.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/CriterionNPCAP.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/CriterionInputDataReader.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/VariablesGroup.cpp
@@ -47,7 +48,8 @@ target_sources(benders_core PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/benders/benders_core/BendersMethod.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/benders/benders_core/BendersStructsDatas.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/benders/benders_core/CriterionComputation.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/benders/benders_core/CriterionLOL.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/benders/benders_core/CriterionLOLE.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/benders/benders_core/CriterionUNSPENERG.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/benders/benders_core/CriterionNPCAP.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/benders/benders_core/CriterionInputDataReader.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/benders/benders_core/CustomVector.h

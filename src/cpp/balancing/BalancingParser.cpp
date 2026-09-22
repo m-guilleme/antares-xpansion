@@ -113,9 +113,13 @@ void BalancingParser::parseGlobalSettings()
     if (config["reliability_standard_indicator"])
     {
         auto criterionStr = config["reliability_standard_indicator"].as<std::string>();
-        if (criterionStr == "LOLE")
+        if (criterionStr == "UNSP_ENERG")
         {
             reliabilityStandardIndicator = Benders::Criterion::Type::UnsuppliedEnergy;
+        }
+        else if (criterionStr == "LOLE")
+        {
+            reliabilityStandardIndicator = Benders::Criterion::Type::LossOfLoadExpectation;
         }
         else if (criterionStr == "NPCAP_HOURS")
         {
