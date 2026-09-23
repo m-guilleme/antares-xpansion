@@ -5,14 +5,12 @@
 #include <tbb/global_control.h>
 
 #include "antares-xpansion/bellman_values/BellmanValues.h"
-#include "antares-xpansion/bellman_values/BellmanValuesExeOptions.h"
 #include "antares-xpansion/bellman_values/DynamicProgrammingConfigReader.h"
 #include "antares-xpansion/bellman_values/ProblemManager.h"
 #include "antares-xpansion/bellman_values/SettingsConfigReader.h"
 #include "antares-xpansion/benders/logger/MultithreadTBBLogger.h"
+#include "antares-xpansion/exe_options/CommonExeOptions.h"
 #include "antares-xpansion/lpnamer/main/ProblemGenerationForWaterValueCalculation.h"
-#include "antares-xpansion/lpnamer/problem_modifier/XpansionProblemsFromAntaresProvider.h"
-#include "malloc.h"
 
 std::vector<double> interpolateVector(const std::vector<double>& originalValues, int targetSize)
 {
@@ -180,7 +178,7 @@ int main(int argc, char** argv)
 {
     try
     {
-        auto optionsParser = BellmanValuesExeOptions();
+        auto optionsParser = CommonExeOptions();
         optionsParser.Parse(argc, argv);
         auto studyPath = optionsParser.StudyPath();
         int nbThreads = optionsParser.NbThreads();
@@ -194,11 +192,11 @@ int main(int argc, char** argv)
         nbThreads = std::min(nbThreads, max_thread_concurrency);
 
         const std::filesystem::path bellmanConfigFilePath(
-          studyPath / "user/water_values/dynamic_programming.yaml");
+          studyPath / "user/water_values/dynamic_programming.yml");
         const std::filesystem::path settingsConfigFilePath(studyPath
-                                                           / "user/water_values/settings.yaml");
+                                                           / "user/water_values/settings.yml");
 
-        // SettingsConfigReader will check whether the settings.yaml file exists and
+        // SettingsConfigReader will check whether the settings.yml file exists and
         // return default values if needed
         SettingsConfigReader scr(settingsConfigFilePath);
         std::string solverName = scr.getSolver();
@@ -231,7 +229,7 @@ int main(int argc, char** argv)
                                                                  / "user/water_values/grid.csv",
                                                                logger);
 
-        // DynamicProgrammingConfigReader will check whether the dynamic_programming.yaml file
+        // DynamicProgrammingConfigReader will check whether the dynamic_programming.yml file
         // exists and return default values if needed
         // TODO: check that there aren't any zones in the file that aren't in grid.csv
         DynamicProgrammingConfigReader dpcr(bellmanConfigFilePath);

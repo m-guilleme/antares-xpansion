@@ -21,6 +21,7 @@ endif ()
 # unit tests
 # --------------------------------------------------------------------------
 add_subdirectory(benders)
+add_subdirectory(balancing)
 add_subdirectory(grid_search)
 add_subdirectory(bellman_values_compute)
 add_subdirectory(full_run)

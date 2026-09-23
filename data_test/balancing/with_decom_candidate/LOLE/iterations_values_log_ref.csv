@@ -1,0 +1,24 @@
+iteration,zone,criteria,action,cluster candidate,capacity change
+1,area2,LOWER,DECOMMISSIONING,unprofitable_peak,-1000
+2,area2,LOWER,DECOMMISSIONING,unprofitable_peak,-1000
+3,area2,LOWER,DECOMMISSIONING,unprofitable_peak,-1000
+4,area1,HIGHER,INVESTMENT,invest_peak,450
+4,area2,LOWER,DECOMMISSIONING,unprofitable_peak,-1000
+5,area1,HIGHER,INVESTMENT,invest_semibase1,450
+5,area2,HIGHER,RECOMMISSIONING,unprofitable_peak,900
+6,area1,LOWER,DISINVESTMENT,invest_semibase1,-400
+6,area2,LOWER,DECOMMISSIONING,unprofitable_peak,-800
+7,area1,HIGHER,INVESTMENT,invest_semibase1,350
+7,area2,HIGHER,RECOMMISSIONING,unprofitable_peak,700
+8,area2,LOWER,DECOMMISSIONING,unprofitable_peak,-600
+9,area1,HIGHER,INVESTMENT,invest_peak,300
+9,area2,LOWER,DECOMMISSIONING,unprofitable_peak,-600
+10,area1,HIGHER,INVESTMENT,invest_semibase1,300
+10,area2,HIGHER,RECOMMISSIONING,unprofitable_peak,500
+11,area2,LOWER,DECOMMISSIONING,unprofitable_peak,-400
+12,area1,HIGHER,INVESTMENT,invest_peak,250
+12,area2,LOWER,DECOMMISSIONING,unprofitable_peak,-400
+13,area1,HIGHER,INVESTMENT,invest_peak,250
+13,area2,HIGHER,RECOMMISSIONING,unprofitable_peak,300
+14,area2,LOWER,DECOMMISSIONING,unprofitable_peak,-200
+15,area1,HIGHER,INVESTMENT,invest_peak,200
