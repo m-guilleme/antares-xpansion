@@ -48,11 +48,11 @@ protected:
 
     std::ifstream openFileWithChecks(const std::filesystem::path& fileName)
     {
-        std::ifstream file(tmpDir / fileName);
+        std::ifstream file(fileName);
         EXPECT_TRUE(file);
         if (!file)
         {
-            throw std::runtime_error("File does not exist at " + (tmpDir / fileName).string());
+            throw std::runtime_error("File does not exist at " + (fileName).string());
         }
         return file;
     }
@@ -111,7 +111,8 @@ protected:
         logger->display_message("Comparison done.");
     }
 
-    void runStudyAndCompare(const std::string& studyFolderName)
+    void runStudyAndCompare(const std::string& studyFolderName,
+                            const std::string& reliabilityStandardIndicator)
     {
         logger->display_message("Testing of study " + studyFolderName + "...");
         copyStudyData(studyFolderName);
@@ -123,8 +124,8 @@ protected:
         };
 
         // parsing .yml files
-        const std::filesystem::path balancingConfigFilePath(tmpDir
-                                                            / "user/balancing/input_balancing.yml");
+        const std::filesystem::path balancingConfigFilePath(
+          tmpDir / "user/balancing" / ("input_balancing_" + reliabilityStandardIndicator + ".yml"));
         const std::filesystem::path settingsConfigFilePath(tmpDir / "user/balancing/settings.yml");
 
         BalancingParser balParser(balancingConfigFilePath);
@@ -159,8 +160,8 @@ protected:
 
         // balancing
         std::map<Antares::Solver::WeeklyProblemId, PbOutput> res;
-        // First iteration will be iteration 0 (the iteration before any modification is applied to
-        // the problems)
+        // First iteration will be iteration 0 (the iteration before any modification is applied
+        // to the problems)
         int iteration = -1;
         logger->display_message("Starting balancing process");
         pbg.logCriterionAndAreaSettings(res);
@@ -191,28 +192,45 @@ protected:
         logger->display_message("\nComparing results files...");
         // cluster results
         compareOutputFileToRef(directories.simulation_dir / "final_capacities.csv",
-                               tmpDir / "final_capacities_ref.csv");
+                               tmpDir / reliabilityStandardIndicator / "final_capacities_ref.csv");
         // criterion and area results
-        compareOutputFileToRef(finalCriteriaFilePath, tmpDir / "final_criteria_ref.csv");
+        compareOutputFileToRef(finalCriteriaFilePath,
+                               tmpDir / reliabilityStandardIndicator / "final_criteria_ref.csv");
         // iterative logs
-        compareOutputFileToRef(iterationsLogFilePath, tmpDir / "iterations_values_log_ref.csv");
+        compareOutputFileToRef(iterationsLogFilePath,
+                               tmpDir / reliabilityStandardIndicator
+                                 / "iterations_values_log_ref.csv");
 
         logger->display_message("Test of study " + studyFolderName + " done!");
     }
 };
 
-TEST_F(BalancingTestEndToEnd, OneCandidatePerArea)
-
+TEST_F(BalancingTestEndToEnd, OneCandidatePerAreaLOLE)
 {
-    runStudyAndCompare("one_candidate_per_area");
+    runStudyAndCompare("one_candidate_per_area", "LOLE");
 }
 
-TEST_F(BalancingTestEndToEnd, TwoCandidatesPerArea)
+TEST_F(BalancingTestEndToEnd, OneCandidatePerAreaUNSPENERG)
 {
-    runStudyAndCompare("two_candidates_per_area");
+    runStudyAndCompare("one_candidate_per_area", "UNSP_ENERG");
 }
 
-TEST_F(BalancingTestEndToEnd, WithDecomCandidate)
+TEST_F(BalancingTestEndToEnd, TwoCandidatesPerAreaLOLE)
 {
-    runStudyAndCompare("with_decom_candidate");
+    runStudyAndCompare("two_candidates_per_area", "LOLE");
+}
+
+TEST_F(BalancingTestEndToEnd, TwoCandidatesPerAreaUNSPENERG)
+{
+    runStudyAndCompare("two_candidates_per_area", "UNSP_ENERG");
+}
+
+TEST_F(BalancingTestEndToEnd, WithDecomCandidateLOLE)
+{
+    runStudyAndCompare("with_decom_candidate", "LOLE");
+}
+
+TEST_F(BalancingTestEndToEnd, WithDecomCandidateUNSPENERG)
+{
+    runStudyAndCompare("with_decom_candidate", "UNSP_ENERG");
 }

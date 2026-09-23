@@ -1,10 +1,10 @@
-reliability_standard_dead_band_up: 0.5
-reliability_standard_dead_band_down: 0.5
-reliability_standard_indicator: LOLE # Or NPCAP_HOURS Or UNSP_ENERG
+reliability_standard_dead_band_up: 1
+reliability_standard_dead_band_down: 1
+reliability_standard_indicator: UNSP_ENERG
 
 areas:
   area1:
-    reliability_standard: 3.5
+    reliability_standard: 651
     decommissioning_increment: 1000
     investment_increment: 500
     max_oscillation: 30
@@ -13,7 +13,7 @@ areas:
       invest_semibase1: semibase_type
       invest_peak: peak_type
   area2:
-    reliability_standard: 3
+    reliability_standard: 137
     decommissioning_increment: 1000
     investment_increment: 500
     max_oscillation: 30
