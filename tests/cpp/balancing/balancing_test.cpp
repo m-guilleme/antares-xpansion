@@ -65,7 +65,8 @@ protected:
         };
         const std::filesystem::path iterLogFilePath = directories.simulation_dir
                                                       / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
+        const std::filesystem::path inputBalFilePath(tmpDir
+                                                     / "user/balancing/input_balancing_LOLE.yml");
         // instantiation of ProblemGenerationForBalancing with dummy data
         BalancingParser dummyBalParser(inputBalFilePath);
         auto problemManager = std::make_shared<ProblemManager>("xpress",
@@ -105,8 +106,7 @@ protected:
           {"recom_area", CapacityAction::DECOMMISSIONING}};
         pbg.lastActionForArea = lastActionForArea;
 
-        // set pbg.balancingData, probleManager.solutions_ and simuValues
-        std::map<AreaCluster, BalancingData> balancingData;
+        // set pbg.area, probleManager.solutions_ and simuValues
         std::vector<double> solution(168 * 8);
         PbOutput pbOutput;
         std::map<std::string, int> areaCriterionValues = {{"invest_area", 5},
@@ -133,10 +133,20 @@ protected:
                     areaClusterIndices.at(hour) = idx;
                     idx += 1;
                 }
-                balancingData[{areaName, candidateName}].dispProdVarIndices = areaClusterIndices;
+                if (areaName == "invest_area" || areaName == "desinvest_area")
+                {
+                    pbg.areas.at(areaName).investmentCandidates.at(candidateName).dispProdVarIndices
+                      = areaClusterIndices;
+                }
+                else
+                {
+                    pbg.areas.at(areaName)
+                      .decommissioningCandidates.at(candidateName)
+                      .dispProdVarIndices
+                      = areaClusterIndices;
+                }
             }
         }
-        pbg.balancingData = balancingData;
         Antares::Solver::WeeklyProblemId pbId({1, 1});
         pbg.problemManager->setProblemSolution(pbId, solution);
         std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues = {{pbId, pbOutput}};
@@ -223,7 +233,8 @@ protected:
         };
         const std::filesystem::path iterLogFilePath = directories.simulation_dir
                                                       / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
+        const std::filesystem::path inputBalFilePath(tmpDir
+                                                     / "user/balancing/input_balancing_LOLE.yml");
         // instantiation of ProblemGenerationForBalancing
         BalancingParser balParser(inputBalFilePath);
         auto problemManager = std::make_shared<ProblemManager>();
@@ -275,8 +286,19 @@ protected:
                   .setOneWeekBoundsData(pbId, oneWeekBoundData);
             }
         }
-
-        const auto& varIndices = pbg.balancingData.at({areaName, candidateName}).dispProdVarIndices;
+        std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
+        if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
+        {
+            varIndices = pbg.areas.at(areaName)
+                           .investmentCandidates.at(candidateName)
+                           .dispProdVarIndices;
+        }
+        else
+        {
+            varIndices = pbg.areas.at(areaName)
+                           .decommissioningCandidates.at(candidateName)
+                           .dispProdVarIndices;
+        }
         auto& area = pbg.areas.at(areaName);
         std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
 
@@ -313,7 +335,8 @@ protected:
         };
         const std::filesystem::path iterLogFilePath = directories.simulation_dir
                                                       / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
+        const std::filesystem::path inputBalFilePath(tmpDir
+                                                     / "user/balancing/input_balancing_LOLE.yml");
         // instantiation of ProblemGenerationForBalancing
         BalancingParser balParser(inputBalFilePath);
         auto problemManager = std::make_shared<ProblemManager>("xpress",
@@ -349,13 +372,29 @@ protected:
             pbg.areas.at(areaName).decommissioningCandidates.at(candidateName).type->fixedOmCosts
               = fixedOmCosts;
         }
-        // set marginalCost
-        pbg.balancingData.at({areaName, candidateName}).marginalCost = marginalCost;
         // set probleManager.solutions_
         Antares::Solver::WeeklyProblemId pbId({1, 1});
         // set arbitrary size of solution big enough to cover candidate indices in each study
         std::vector<double> solution(3100, 0);
-        for (const auto& idx: pbg.balancingData.at({areaName, candidateName}).dispProdVarIndices)
+
+        std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
+        if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
+        {
+            pbg.areas.at(areaName).investmentCandidates.at(candidateName).marginalCost
+              = marginalCost;
+            varIndices = pbg.areas.at(areaName)
+                           .investmentCandidates.at(candidateName)
+                           .dispProdVarIndices;
+        }
+        else
+        {
+            pbg.areas.at(areaName).decommissioningCandidates.at(candidateName).marginalCost
+              = marginalCost;
+            varIndices = pbg.areas.at(areaName)
+                           .decommissioningCandidates.at(candidateName)
+                           .dispProdVarIndices;
+        }
+        for (const auto& idx: varIndices)
         {
             solution.at(idx) = hourlySolutionValue;
         }
@@ -410,7 +449,8 @@ protected:
         };
         const std::filesystem::path iterLogFilePath = directories.simulation_dir
                                                       / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
+        const std::filesystem::path inputBalFilePath(tmpDir
+                                                     / "user/balancing/input_balancing_LOLE.yml");
         // instantiation of ProblemGenerationForBalancing
         BalancingParser balParser(inputBalFilePath);
         auto problemManager = std::make_shared<ProblemManager>();
