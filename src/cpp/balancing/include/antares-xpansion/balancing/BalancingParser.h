@@ -9,7 +9,6 @@
 #include "antares-xpansion/benders/benders_core/CriterionInputDataReader.h"
 
 constexpr int NUMBER_OF_HOURS_PER_WEEK = 168;
-
 enum class CriterionState
 {
     LOWER,
@@ -17,6 +16,7 @@ enum class CriterionState
     HIGHER,
     UNINITIALIZED,
 };
+using AreaCriterionData = std::pair<double, CriterionState>;
 
 constexpr std::string_view to_string(CriterionState state)
 {
@@ -84,6 +84,8 @@ struct Area
     std::map<std::string, Candidate<DecommissioningCandidateType>> decommissioningCandidates;
     std::map<std::string, Candidate<InvestmentCandidateType>> investmentCandidates;
     CriterionState oldCriterionState{CriterionState::UNINITIALIZED};
+    double avgCriteria;
+    CriterionState criterionState{CriterionState::UNINITIALIZED};
 
     bool isInvestmentPossible() const;
     bool isDecommissioningPossible() const;

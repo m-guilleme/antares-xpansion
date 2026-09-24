@@ -10,8 +10,6 @@
 #include "antares-xpansion/lpnamer/model/Problem.h"
 
 using AreaCluster = std::pair<std::string, std::string>;
-// AreaCriterionData contains <average area criteria value, area criterion state>
-using AreaCriterionData = std::pair<double, CriterionState>;
 
 enum class CapacityAction
 {
@@ -65,7 +63,6 @@ private:
     std::map<std::string, Area>& areas;
     std::map<AreaCluster, OscillationStatus> oscillationRecords;
     std::map<std::string, CapacityAction> lastActionForArea;
-    std::map<std::string, AreaCriterionData> currentAreaCriteriaData;
     std::filesystem::path iterationsLogFileName;
 
     double lowerThreshold(const Area& area) const
@@ -90,10 +87,8 @@ private:
     void updateRecords(const AreaCluster& areaCluster, CapacityAction action);
     std::map<AreaCluster, CapacityAction> findAreaClustersToModify(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);
-    CriterionState criterionState(const Area& area, double value) const;
-    std::map<std::string, AreaCriterionData> computeAreaCriteriaData(
-      const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues) const;
-    void updateAreaSettingsIncrement(const std::map<std::string, AreaCriterionData>& areaCritState);
+    CriterionState computeCriterionState(const Area& area, double value) const;
+    void updateAreaSettingsIncrement();
     void applyActionToCluster(const AreaCluster& areaCluster, CapacityAction action);
     std::string getBestCluster(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues,
