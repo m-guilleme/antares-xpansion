@@ -9,7 +9,7 @@
 #include "antares-xpansion/lpnamer/main/ProblemGenerationOptimSimu.h"
 #include "antares-xpansion/lpnamer/model/Problem.h"
 
-using AreaCluster = std::pair<std::string, std::string>;
+using AreaCandidate = std::pair<std::string, std::string>;
 
 enum class CapacityAction
 {
@@ -61,7 +61,7 @@ public:
 private:
     bool blocked = false;
     std::map<std::string, Area>& areas;
-    std::map<AreaCluster, OscillationStatus> oscillationRecords;
+    std::map<AreaCandidate, OscillationStatus> oscillationRecords;
     std::map<std::string, CapacityAction> lastActionForArea;
     std::filesystem::path iterationsLogFileName;
 
@@ -79,18 +79,18 @@ private:
     void fillDispProdVarIndicesAndMarginalCosts();
     template<typename T>
     void setCapacityDataForOneCandidate(const std::string& areaName,
-                                        const std::string& clusterName,
+                                        const std::string& candidateName,
                                         Candidate<T>& candidate);
     void setCapacitiesDataForCandidates();
     void initializeOscillationRecords();
     bool maxOscillationReached(const std::string& areaName) const;
-    void updateRecords(const AreaCluster& areaCluster, CapacityAction action);
-    std::map<AreaCluster, CapacityAction> findAreaClustersToModify(
+    void updateRecords(const AreaCandidate& areaCandidate, CapacityAction action);
+    std::map<AreaCandidate, CapacityAction> findAreaCandidatesToModify(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);
     CriterionState computeCriterionState(const Area& area, double value) const;
-    void updateAreaSettingsIncrement();
-    void applyActionToCluster(const AreaCluster& areaCluster, CapacityAction action);
-    std::string getBestCluster(
+    void updateAreasIncrement();
+    void applyActionToCluster(const AreaCandidate& areaCandidate, CapacityAction action);
+    std::string getBestCandidate(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues,
       const std::string& areaName,
       const Area& area,
@@ -108,12 +108,12 @@ private:
     template<typename T>
     void fillDispProdVarIndicesAndMarginalCostsForArea(
       const std::string& areaName,
-      const std::string& clusterName,
+      const std::string& candidateName,
       Candidate<T>& candidate,
       const std::unordered_map<std::string, size_t>& varToIndex,
       const std::vector<double>& objCoeffs);
     void computeCandidateInstalledCapacity(CapacityAction action,
                                            Area& area,
-                                           const std::string& clusterName);
+                                           const std::string& candidateName);
     friend class BalancingTest;
 };

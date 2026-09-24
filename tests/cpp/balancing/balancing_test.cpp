@@ -46,9 +46,9 @@ protected:
                                 | std::filesystem::copy_options::overwrite_existing);
     }
 
-    void testFindAreaClustersToModify()
+    void testFindAreaCandidatesToModify()
     {
-        logger->display_message("Testing of findAreaClusterToModify");
+        logger->display_message("Testing of findAreaCandidatesToModify");
 
         std::vector<std::string> areasName = {"invest_area",
                                               "desinvest_area",
@@ -126,24 +126,24 @@ protected:
             pbOutput.areaPrices[areaName] = areaPrices;
             for (std::string candidateName: candidatesName)
             {
-                std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> areaClusterIndices;
+                std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> areaCandidateIndices;
                 for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
                 {
                     solution.at(idx) = (candidateName == "candidate_1") ? 1.0 : 0.0;
-                    areaClusterIndices.at(hour) = idx;
+                    areaCandidateIndices.at(hour) = idx;
                     idx += 1;
                 }
                 if (areaName == "invest_area" || areaName == "desinvest_area")
                 {
                     pbg.areas.at(areaName).investmentCandidates.at(candidateName).dispProdVarIndices
-                      = areaClusterIndices;
+                      = areaCandidateIndices;
                 }
                 else
                 {
                     pbg.areas.at(areaName)
                       .decommissioningCandidates.at(candidateName)
                       .dispProdVarIndices
-                      = areaClusterIndices;
+                      = areaCandidateIndices;
                 }
             }
         }
@@ -152,31 +152,31 @@ protected:
         std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues = {{pbId, pbOutput}};
         // compute areaCriteriaData
         pbg.updateAreaCriteriaData(simuValues);
-        // run findAreaClustersToModify
-        std::map<AreaCluster, CapacityAction> areaClusterToModify = pbg.findAreaClustersToModify(
-          simuValues);
+        // run findAreaCandidatesToModify
+        std::map<AreaCandidate, CapacityAction>
+          areaCandidateToModify = pbg.findAreaCandidatesToModify(simuValues);
         // assert results
         // we check that the correct candidate and action have been selected
-        for (const auto& [areaCluster, action]: areaClusterToModify)
+        for (const auto& [areaCandidate, action]: areaCandidateToModify)
         {
-            if (areaCluster.first == "invest_area")
+            if (areaCandidate.first == "invest_area")
             {
-                EXPECT_TRUE(areaCluster.second == "candidate_1");
+                EXPECT_TRUE(areaCandidate.second == "candidate_1");
                 EXPECT_TRUE(action == CapacityAction::INVESTMENT);
             }
-            if (areaCluster.first == "desinvest_area")
+            if (areaCandidate.first == "desinvest_area")
             {
-                EXPECT_TRUE(areaCluster.second == "candidate_2");
+                EXPECT_TRUE(areaCandidate.second == "candidate_2");
                 EXPECT_TRUE(action == CapacityAction::DISINVESTMENT);
             }
-            if (areaCluster.first == "decom_area")
+            if (areaCandidate.first == "decom_area")
             {
-                EXPECT_TRUE(areaCluster.second == "candidate_2");
+                EXPECT_TRUE(areaCandidate.second == "candidate_2");
                 EXPECT_TRUE(action == CapacityAction::DECOMMISSIONING);
             }
-            if (areaCluster.first == "recom_area")
+            if (areaCandidate.first == "recom_area")
             {
-                EXPECT_TRUE(areaCluster.second == "candidate_1");
+                EXPECT_TRUE(areaCandidate.second == "candidate_1");
                 EXPECT_TRUE(action == CapacityAction::RECOMMISSIONING);
             }
         }
@@ -192,7 +192,7 @@ protected:
                 EXPECT_TRUE(area.oldCriterionState == CriterionState::LOWER);
             }
         }
-        logger->display_message("Test of findAreaClusterToModify done!");
+        logger->display_message("Test of findAreaCandidatesToModify done!");
     }
 
     void assertCandidateBounds(std::shared_ptr<ProblemManager> problemManager,
@@ -557,9 +557,9 @@ protected:
     }
 };
 
-TEST_F(BalancingTest, findAreaClustersToModify)
+TEST_F(BalancingTest, findAreaCandidatesToModify)
 {
-    testFindAreaClustersToModify();
+    testFindAreaCandidatesToModify();
 }
 
 TEST_F(BalancingTest, applyInvestmentActionToClusterWithUpperonlyBound)
