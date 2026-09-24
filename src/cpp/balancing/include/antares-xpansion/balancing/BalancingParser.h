@@ -8,6 +8,8 @@
 
 #include "antares-xpansion/benders/benders_core/CriterionInputDataReader.h"
 
+constexpr int NUMBER_OF_HOURS_PER_WEEK = 168;
+
 enum class CriterionState
 {
     LOWER,
@@ -58,6 +60,8 @@ struct Candidate
     double installedCapacity;
     double previousInstalledCapacity;
     double initInstalledCapacity;
+    double marginalCost;
+    std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> dispProdVarIndices;
     std::map<Antares::Solver::WeeklyProblemId, std::vector<BoundData>> boundsData;
 
     void setOneWeekBoundsData(Antares::Solver::WeeklyProblemId pbId,

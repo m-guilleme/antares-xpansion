@@ -35,9 +35,11 @@ ProblemGenerationForBalancing::ProblemGenerationForBalancing(
 /// @param clusterName The name of the cluster to process
 /// @param varToIndex A map from variable names to their indices
 /// @param objCoeffs The objective coefficients for each variable
+template<typename T>
 void ProblemGenerationForBalancing::fillDispProdVarIndicesAndMarginalCostsForArea(
   const std::string& areaName,
   const std::string& clusterName,
+  Candidate<T>& candidate,
   const std::unordered_map<std::string, size_t>& varToIndex,
   const std::vector<double>& objCoeffs)
 {
@@ -52,11 +54,11 @@ void ProblemGenerationForBalancing::fillDispProdVarIndicesAndMarginalCostsForAre
         const auto it = varToIndex.find(varName);
         if (it != varToIndex.end())
         {
-            balancingData[key].dispProdVarIndices[hour] = it->second;
+            candidate.dispProdVarIndices[hour] = it->second;
 
             if (hour == 0)
             {
-                balancingData[key].marginalCost = objCoeffs[it->second];
+                candidate.marginalCost = objCoeffs[it->second];
             }
         }
         else
@@ -68,11 +70,12 @@ void ProblemGenerationForBalancing::fillDispProdVarIndicesAndMarginalCostsForAre
     }
 }
 
+template<typename T>
 void ProblemGenerationForBalancing::setCapacityDataForOneCandidate(const std::string& areaName,
                                                                    const std::string& clusterName,
-                                                                   auto& candidate)
+                                                                   Candidate<T>& candidate)
 {
-    const auto& dispProdVarIndices = balancingData[{areaName, clusterName}].dispProdVarIndices;
+    const auto& dispProdVarIndices = candidate.dispProdVarIndices;
     double installedCapacity = 0.0;
     for (const auto& pbId: problemManager->getProblemIds())
     {
@@ -167,19 +170,21 @@ void ProblemGenerationForBalancing::fillDispProdVarIndicesAndMarginalCosts()
 
     const auto varToIndex = buildVarToIndex(vars);
 
-    for (const auto& [areaName, area]: areas)
+    for (auto& [areaName, area]: areas)
     {
-        for (const auto& clusterName: area.investmentCandidates | std::views::keys)
+        for (auto& [clusterName, candidate]: area.investmentCandidates)
         {
             fillDispProdVarIndicesAndMarginalCostsForArea(areaName,
                                                           clusterName,
+                                                          candidate,
                                                           varToIndex,
                                                           objCoeffs);
         }
-        for (const auto& clusterName: area.decommissioningCandidates | std::views::keys)
+        for (auto& [clusterName, candidate]: area.decommissioningCandidates)
         {
             fillDispProdVarIndicesAndMarginalCostsForArea(areaName,
                                                           clusterName,
+                                                          candidate,
                                                           varToIndex,
                                                           objCoeffs);
         }
@@ -563,11 +568,10 @@ std::map<std::string, double> ProblemGenerationForBalancing::computeRentabilityF
             }
         }
         double production(0.0);
-        double marginalCost = balancingData.at({areaName, clusterName}).marginalCost;
+        double marginalCost = candidate.marginalCost;
         for (const auto& [pbId, pbOutput]: simuValues)
         {
-            const auto& dispProdVarIndices = balancingData.at({areaName, clusterName})
-                                               .dispProdVarIndices;
+            const auto& dispProdVarIndices = candidate.dispProdVarIndices;
             // production is fetched from values resulting of the optimization
             std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
             auto solution = problemManager->getProblemSolution(pbId, problem);
@@ -755,8 +759,7 @@ void ProblemGenerationForBalancing::applyActionToCluster(const AreaCluster& area
 {
     lastActionForArea[areaCluster.first] = action;
 
-    const auto& varIndices = balancingData.at(areaCluster).dispProdVarIndices;
-    std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
+    std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
 
     auto& area = areas.at(areaCluster.first);
     computeCandidateInstalledCapacity(action, area, areaCluster.second);
@@ -764,11 +767,14 @@ void ProblemGenerationForBalancing::applyActionToCluster(const AreaCluster& area
     if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
     {
         installedCapacity = area.investmentCandidates.at(areaCluster.second).installedCapacity;
+        varIndices = area.investmentCandidates.at(areaCluster.second).dispProdVarIndices;
     }
     else
     {
         installedCapacity = area.decommissioningCandidates.at(areaCluster.second).installedCapacity;
+        varIndices = area.decommissioningCandidates.at(areaCluster.second).dispProdVarIndices;
     }
+    std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
 
     tbb::parallel_for_each(
       problemManager->getProblemIds(),

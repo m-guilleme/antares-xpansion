@@ -38,12 +38,6 @@ constexpr std::string_view to_string(CapacityAction action)
     }
 }
 
-struct BalancingData
-{
-    double marginalCost;
-    std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> dispProdVarIndices;
-};
-
 /// @brief Class to generate and modify problems in memory
 class ProblemGenerationForBalancing: public ProblemGenerationOptimSimu
 {
@@ -69,7 +63,6 @@ public:
 private:
     bool blocked = false;
     std::map<std::string, Area>& areas;
-    std::map<AreaCluster, BalancingData> balancingData;
     std::map<AreaCluster, OscillationStatus> oscillationRecords;
     std::map<std::string, CapacityAction> lastActionForArea;
     std::map<std::string, AreaCriterionData> currentAreaCriteriaData;
@@ -87,9 +80,10 @@ private:
 
     void initializeIterativeLogCSV() const;
     void fillDispProdVarIndicesAndMarginalCosts();
+    template<typename T>
     void setCapacityDataForOneCandidate(const std::string& areaName,
                                         const std::string& clusterName,
-                                        auto& candidate);
+                                        Candidate<T>& candidate);
     void setCapacitiesDataForCandidates();
     void initializeOscillationRecords();
     bool maxOscillationReached(const std::string& areaName) const;
@@ -116,9 +110,11 @@ private:
       const std::map<std::string, Candidate<T>>& candidates,
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues,
       CapacityAction action) const;
+    template<typename T>
     void fillDispProdVarIndicesAndMarginalCostsForArea(
       const std::string& areaName,
       const std::string& clusterName,
+      Candidate<T>& candidate,
       const std::unordered_map<std::string, size_t>& varToIndex,
       const std::vector<double>& objCoeffs);
     void computeCandidateInstalledCapacity(CapacityAction action,

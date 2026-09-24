@@ -9,7 +9,6 @@
 #include "antares-xpansion/xpansion_interfaces/ILogger.h"
 
 constexpr char BALANCING_EVALUATOR_LOGGER_CONTEXT[] = "GreedyBalancingFinder";
-constexpr int NUMBER_OF_HOURS_PER_WEEK = 168;
 
 using namespace PlainData;
 
