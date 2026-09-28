@@ -58,6 +58,12 @@ public:
     void updateAreaCriteriaData(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);
 
+    Candidate<InvestmentCandidateType>& getInvestmentCandidate(const std::string& areaName,
+                                                               const std::string& candidateName);
+    Candidate<DecommissioningCandidateType>& getDecommissioningCandidate(
+      const std::string& areaName,
+      const std::string& candidateName);
+
 private:
     bool blocked = false;
     std::map<std::string, Area>& areas;
@@ -112,6 +118,7 @@ private:
       Candidate<T>& candidate,
       const std::unordered_map<std::string, size_t>& varToIndex,
       const std::vector<double>& objCoeffs);
+
     void computeCandidateInstalledCapacity(CapacityAction action,
                                            Area& area,
                                            const std::string& candidateName);

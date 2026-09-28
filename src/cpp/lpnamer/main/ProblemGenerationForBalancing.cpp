@@ -714,29 +714,37 @@ void ProblemGenerationForBalancing::computeCandidateInstalledCapacity(
     switch (action)
     {
     case CapacityAction::INVESTMENT:
-        area.investmentCandidates.at(candidateName).installedCapacity = std::min(
-          area.investmentCandidates.at(candidateName).installedCapacity
-            + area.currentInvestmentIncrement,
-          area.investmentCandidates.at(candidateName).type->expansionPotential);
+    {
+        auto& candidate = area.getInvestmentCandidate(candidateName);
+        candidate.installedCapacity = std::min(candidate.installedCapacity
+                                                 + area.currentInvestmentIncrement,
+                                               candidate.type->expansionPotential);
         break;
+    }
     case CapacityAction::DISINVESTMENT:
-        area.investmentCandidates.at(candidateName).installedCapacity = std::max(
-          area.investmentCandidates.at(candidateName).installedCapacity
-            - area.currentInvestmentIncrement,
-          area.investmentCandidates.at(candidateName).initInstalledCapacity);
+    {
+        auto& candidate = area.getInvestmentCandidate(candidateName);
+        candidate.installedCapacity = std::max(candidate.installedCapacity
+                                                 - area.currentInvestmentIncrement,
+                                               candidate.initInstalledCapacity);
         break;
+    }
     case CapacityAction::DECOMMISSIONING:
-        area.decommissioningCandidates.at(candidateName).installedCapacity = std::max(
-          area.decommissioningCandidates.at(candidateName).installedCapacity
-            - area.currentDecommissioningIncrement,
-          area.decommissioningCandidates.at(candidateName).type->decommissioningPotential);
+    {
+        auto& candidate = area.getDecommissioningCandidate(candidateName);
+        candidate.installedCapacity = std::max(candidate.installedCapacity
+                                                 - area.currentDecommissioningIncrement,
+                                               candidate.type->decommissioningPotential);
         break;
+    }
     case CapacityAction::RECOMMISSIONING:
-        area.decommissioningCandidates.at(candidateName).installedCapacity = std::min(
-          area.decommissioningCandidates.at(candidateName).installedCapacity
-            + area.currentDecommissioningIncrement,
-          area.decommissioningCandidates.at(candidateName).initInstalledCapacity);
+    {
+        auto& candidate = area.getDecommissioningCandidate(candidateName);
+        candidate.installedCapacity = std::min(candidate.installedCapacity
+                                                 + area.currentDecommissioningIncrement,
+                                               candidate.initInstalledCapacity);
         break;
+    }
     }
 }
 
@@ -755,14 +763,14 @@ void ProblemGenerationForBalancing::applyActionToCluster(const AreaCandidate& ar
     double installedCapacity;
     if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
     {
-        installedCapacity = area.investmentCandidates.at(areaCandidate.second).installedCapacity;
-        varIndices = area.investmentCandidates.at(areaCandidate.second).dispProdVarIndices;
+        installedCapacity = area.getInvestmentCandidate(areaCandidate.second).installedCapacity;
+        varIndices = area.getInvestmentCandidate(areaCandidate.second).dispProdVarIndices;
     }
     else
     {
-        installedCapacity = area.decommissioningCandidates.at(areaCandidate.second)
+        installedCapacity = area.getDecommissioningCandidate(areaCandidate.second)
                               .installedCapacity;
-        varIndices = area.decommissioningCandidates.at(areaCandidate.second).dispProdVarIndices;
+        varIndices = area.getDecommissioningCandidate(areaCandidate.second).dispProdVarIndices;
     }
     std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
 
@@ -775,12 +783,12 @@ void ProblemGenerationForBalancing::applyActionToCluster(const AreaCandidate& ar
           {
           case CapacityAction::INVESTMENT:
           case CapacityAction::DISINVESTMENT:
-              oneWeekBoundsDataCandidate = area.investmentCandidates.at(areaCandidate.second)
+              oneWeekBoundsDataCandidate = area.getInvestmentCandidate(areaCandidate.second)
                                              .boundsData[pbId];
               break;
           case CapacityAction::DECOMMISSIONING:
           case CapacityAction::RECOMMISSIONING:
-              oneWeekBoundsDataCandidate = area.decommissioningCandidates.at(areaCandidate.second)
+              oneWeekBoundsDataCandidate = area.getDecommissioningCandidate(areaCandidate.second)
                                              .boundsData[pbId];
               break;
           }
@@ -803,9 +811,9 @@ void ProblemGenerationForBalancing::applyActionToCluster(const AreaCandidate& ar
       });
 }
 
-static double getCandidateCurrentCapacity(const std::map<std::string, Area>& areas,
-                                          const CapacityAction& action,
-                                          const AreaCandidate& areaCandidate)
+double getCandidateCurrentCapacity(std::map<std::string, Area>& areas,
+                                   const CapacityAction& action,
+                                   const AreaCandidate& areaCandidate)
 {
     double candidateCurrentCapacity;
     switch (action)
@@ -813,13 +821,13 @@ static double getCandidateCurrentCapacity(const std::map<std::string, Area>& are
     case CapacityAction::INVESTMENT:
     case CapacityAction::DISINVESTMENT:
         candidateCurrentCapacity = areas.at(areaCandidate.first)
-                                     .investmentCandidates.at(areaCandidate.second)
+                                     .getInvestmentCandidate(areaCandidate.second)
                                      .installedCapacity;
         break;
     case CapacityAction::DECOMMISSIONING:
     case CapacityAction::RECOMMISSIONING:
         candidateCurrentCapacity = areas.at(areaCandidate.first)
-                                     .decommissioningCandidates.at(areaCandidate.second)
+                                     .getDecommissioningCandidate(areaCandidate.second)
                                      .installedCapacity;
         break;
     }
@@ -949,4 +957,18 @@ bool ProblemGenerationForBalancing::maxOscillationReached(const std::string& are
         }
     }
     return maxOscillationReached;
+}
+
+Candidate<InvestmentCandidateType>& ProblemGenerationForBalancing::getInvestmentCandidate(
+  const std::string& areaName,
+  const std::string& candidateName)
+{
+    return areas.at(areaName).getInvestmentCandidate(candidateName);
+}
+
+Candidate<DecommissioningCandidateType>& ProblemGenerationForBalancing::getDecommissioningCandidate(
+  const std::string& areaName,
+  const std::string& candidateName)
+{
+    return areas.at(areaName).getDecommissioningCandidate(candidateName);
 }

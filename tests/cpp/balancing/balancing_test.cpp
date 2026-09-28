@@ -86,18 +86,12 @@ protected:
           "data_test/balancing/find_area_cluster_to_modify/input_balancing.yml");
         BalancingParser balParser(balancingConfigFilePath);
         pbg.areas = balParser.areas;
-        pbg.areas.at("desinvest_area").investmentCandidates.at("candidate_1").installedCapacity
-          = 1000;
-        pbg.areas.at("desinvest_area").investmentCandidates.at("candidate_2").installedCapacity
-          = 1000;
-        pbg.areas.at("decom_area").decommissioningCandidates.at("candidate_1").installedCapacity
-          = 1000;
-        pbg.areas.at("decom_area").decommissioningCandidates.at("candidate_2").installedCapacity
-          = 1000;
-        pbg.areas.at("recom_area").decommissioningCandidates.at("candidate_1").initInstalledCapacity
-          = 1000;
-        pbg.areas.at("recom_area").decommissioningCandidates.at("candidate_2").initInstalledCapacity
-          = 1000;
+        pbg.getInvestmentCandidate("desinvest_area", "candidate_1").installedCapacity = 1000;
+        pbg.getInvestmentCandidate("desinvest_area", "candidate_2").installedCapacity = 1000;
+        pbg.getDecommissioningCandidate("decom_area", "candidate_1").installedCapacity = 1000;
+        pbg.getDecommissioningCandidate("decom_area", "candidate_2").installedCapacity = 1000;
+        pbg.getDecommissioningCandidate("recom_area", "candidate_1").initInstalledCapacity = 1000;
+        pbg.getDecommissioningCandidate("recom_area", "candidate_2").initInstalledCapacity = 1000;
         // set pbg.lastActionForArea
         std::map<std::string, CapacityAction> lastActionForArea = {
           {"invest_area", CapacityAction::INVESTMENT},
@@ -135,14 +129,12 @@ protected:
                 }
                 if (areaName == "invest_area" || areaName == "desinvest_area")
                 {
-                    pbg.areas.at(areaName).investmentCandidates.at(candidateName).dispProdVarIndices
+                    pbg.getInvestmentCandidate(areaName, candidateName).dispProdVarIndices
                       = areaCandidateIndices;
                 }
                 else
                 {
-                    pbg.areas.at(areaName)
-                      .decommissioningCandidates.at(candidateName)
-                      .dispProdVarIndices
+                    pbg.getDecommissioningCandidate(areaName, candidateName).dispProdVarIndices
                       = areaCandidateIndices;
                 }
             }
@@ -250,19 +242,19 @@ protected:
         pbg.areas.at(areaName).currentInvestmentIncrement = capacityIncrement;
         if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
         {
-            pbg.areas.at(areaName).investmentCandidates.at(candidateName).initInstalledCapacity
-              = 4 * capacityIncrement; // we set initInstalledCapacity lower to allow disinvestment
+            auto& candidate = pbg.getInvestmentCandidate(areaName, candidateName);
+            candidate.installedCapacity = 6 * capacityIncrement;
+            // we set initInstalledCapacity lower to allow disinvestment
+            candidate.initInstalledCapacity = 4 * capacityIncrement;
             pbg.areas.at(areaName).currentInvestmentIncrement = capacityIncrement;
-            pbg.areas.at(areaName).investmentCandidates.at(candidateName).installedCapacity
-              = 6 * capacityIncrement;
         }
         else
         {
-            pbg.areas.at(areaName).decommissioningCandidates.at(candidateName).initInstalledCapacity
-              = 4 * capacityIncrement; // we set initInstalledCapacity higher to allow recom
+            auto& candidate = pbg.getDecommissioningCandidate(areaName, candidateName);
+            candidate.installedCapacity = 2 * capacityIncrement;
+            // we set initInstalledCapacity higher to allow recom
+            candidate.initInstalledCapacity = 4 * capacityIncrement;
             pbg.areas.at(areaName).currentDecommissioningIncrement = capacityIncrement;
-            pbg.areas.at(areaName).decommissioningCandidates.at(candidateName).installedCapacity
-              = 2 * capacityIncrement;
         }
 
         for (const auto& pbId: problemManager->getProblemIds())
@@ -275,28 +267,23 @@ protected:
             }
             if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
             {
-                pbg.areas.at(areaName)
-                  .investmentCandidates.at(candidateName)
+                pbg.getInvestmentCandidate(areaName, candidateName)
                   .setOneWeekBoundsData(pbId, oneWeekBoundData);
             }
             else
             {
-                pbg.areas.at(areaName)
-                  .decommissioningCandidates.at(candidateName)
+                pbg.getDecommissioningCandidate(areaName, candidateName)
                   .setOneWeekBoundsData(pbId, oneWeekBoundData);
             }
         }
         std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
         if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
         {
-            varIndices = pbg.areas.at(areaName)
-                           .investmentCandidates.at(candidateName)
-                           .dispProdVarIndices;
+            varIndices = pbg.getInvestmentCandidate(areaName, candidateName).dispProdVarIndices;
         }
         else
         {
-            varIndices = pbg.areas.at(areaName)
-                           .decommissioningCandidates.at(candidateName)
+            varIndices = pbg.getDecommissioningCandidate(areaName, candidateName)
                            .dispProdVarIndices;
         }
         auto& area = pbg.areas.at(areaName);
@@ -354,23 +341,17 @@ protected:
         // set investment cost and fixed om cost
         if (action == CapacityAction::INVESTMENT)
         {
-            pbg.areas.at(areaName).investmentCandidates.at(candidateName).installedCapacity
-              = installedCapacity;
-            pbg.areas.at(areaName).investmentCandidates.at(candidateName).type->investmentCost
-              = investmentCost;
-            pbg.areas.at(areaName).investmentCandidates.at(candidateName).type->fixedOmCosts
-              = fixedOmCosts;
+            auto& candidate = pbg.getInvestmentCandidate(areaName, candidateName);
+            candidate.installedCapacity = installedCapacity;
+            candidate.type->investmentCost = investmentCost;
+            candidate.type->fixedOmCosts = fixedOmCosts;
         }
         else
         {
-            pbg.areas.at(areaName).decommissioningCandidates.at(candidateName).installedCapacity
-              = installedCapacity;
-            pbg.areas.at(areaName)
-              .decommissioningCandidates.at(candidateName)
-              .type->decommissioningCost
-              = investmentCost;
-            pbg.areas.at(areaName).decommissioningCandidates.at(candidateName).type->fixedOmCosts
-              = fixedOmCosts;
+            auto& candidate = pbg.getDecommissioningCandidate(areaName, candidateName);
+            candidate.installedCapacity = installedCapacity;
+            candidate.type->decommissioningCost = investmentCost;
+            candidate.type->fixedOmCosts = fixedOmCosts;
         }
         // set probleManager.solutions_
         Antares::Solver::WeeklyProblemId pbId({1, 1});
@@ -380,19 +361,15 @@ protected:
         std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
         if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
         {
-            pbg.areas.at(areaName).investmentCandidates.at(candidateName).marginalCost
-              = marginalCost;
-            varIndices = pbg.areas.at(areaName)
-                           .investmentCandidates.at(candidateName)
-                           .dispProdVarIndices;
+            auto& candidate = pbg.getInvestmentCandidate(areaName, candidateName);
+            candidate.marginalCost = marginalCost;
+            varIndices = candidate.dispProdVarIndices;
         }
         else
         {
-            pbg.areas.at(areaName).decommissioningCandidates.at(candidateName).marginalCost
-              = marginalCost;
-            varIndices = pbg.areas.at(areaName)
-                           .decommissioningCandidates.at(candidateName)
-                           .dispProdVarIndices;
+            auto& candidate = pbg.getDecommissioningCandidate(areaName, candidateName);
+            candidate.marginalCost = marginalCost;
+            varIndices = candidate.dispProdVarIndices;
         }
         for (const auto& idx: varIndices)
         {
@@ -468,12 +445,10 @@ protected:
         std::map<std::string, double> rentability;
         if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
         {
-            pbg.areas.at(areaName).investmentCandidates.at(candidateName).installedCapacity
-              = capacityValue;
-            pbg.areas.at(areaName).investmentCandidates.at(candidateName).initInstalledCapacity
-              = capacityValue;
-            pbg.areas.at(areaName).investmentCandidates.at(candidateName).type->expansionPotential
-              = capacityValue;
+            auto& candidate = pbg.getInvestmentCandidate(areaName, candidateName);
+            candidate.installedCapacity = capacityValue;
+            candidate.initInstalledCapacity = capacityValue;
+            candidate.type->expansionPotential = capacityValue;
             rentability = pbg.computeRentabilityForCandidates(
               areaName,
               pbg.areas.at(areaName).investmentCandidates,
@@ -482,14 +457,10 @@ protected:
         }
         else
         {
-            pbg.areas.at(areaName).decommissioningCandidates.at(candidateName).installedCapacity
-              = capacityValue;
-            pbg.areas.at(areaName).decommissioningCandidates.at(candidateName).initInstalledCapacity
-              = capacityValue;
-            pbg.areas.at(areaName)
-              .decommissioningCandidates.at(candidateName)
-              .type->decommissioningPotential
-              = capacityValue;
+            auto& candidate = pbg.getDecommissioningCandidate(areaName, candidateName);
+            candidate.installedCapacity = capacityValue;
+            candidate.initInstalledCapacity = capacityValue;
+            candidate.type->decommissioningPotential = capacityValue;
             rentability = pbg.computeRentabilityForCandidates(
               areaName,
               pbg.areas.at(areaName).decommissioningCandidates,
@@ -529,18 +500,12 @@ protected:
                                                                           problemManager,
                                                                           iterLogFilePath);
         // set pbg.areas
-        pbg.areas.at("area2").investmentCandidates.at("invest_semibase").initInstalledCapacity
-          = initInstalledCapacity;
-        pbg.areas.at("area2").investmentCandidates.at("invest_semibase").type->expansionPotential
-          = expansionPotential;
-        pbg.areas.at("area2")
-          .decommissioningCandidates.at("unprofitable_peak")
-          .initInstalledCapacity
-          = initInstalledCapacity;
-        pbg.areas.at("area2")
-          .decommissioningCandidates.at("unprofitable_peak")
-          .type->decommissioningPotential
-          = decommissioningPotential;
+        auto& investCandidate = pbg.getInvestmentCandidate("area2", "invest_semibase");
+        investCandidate.initInstalledCapacity = initInstalledCapacity;
+        investCandidate.type->expansionPotential = expansionPotential;
+        auto& decomCandidate = pbg.getDecommissioningCandidate("area2", "unprofitable_peak");
+        decomCandidate.initInstalledCapacity = initInstalledCapacity;
+        decomCandidate.type->decommissioningPotential = decommissioningPotential;
         //  isInvestmentCycle
         if (setLastAction)
         {

@@ -46,6 +46,17 @@ bool Area::isRecommissioningPossible() const
                                });
 }
 
+Candidate<InvestmentCandidateType>& Area::getInvestmentCandidate(const std::string& candidateName)
+{
+    return investmentCandidates.at(candidateName);
+}
+
+Candidate<DecommissioningCandidateType>& Area::getDecommissioningCandidate(
+  const std::string& candidateName)
+{
+    return decommissioningCandidates.at(candidateName);
+}
+
 /// @brief Constructor of the BalancingParser class
 /// @param pathToYamlConfigFile The path to the YAML configuration file
 BalancingParser::BalancingParser(const std::filesystem::path& pathToYamlConfigFile):

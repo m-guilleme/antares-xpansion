@@ -91,6 +91,9 @@ struct Area
     bool isDecommissioningPossible() const;
     bool isDisinvestmentPossible() const;
     bool isRecommissioningPossible() const;
+    Candidate<InvestmentCandidateType>& getInvestmentCandidate(const std::string& candidateName);
+    Candidate<DecommissioningCandidateType>& getDecommissioningCandidate(
+      const std::string& candidateName);
 };
 
 class BalancingParser
