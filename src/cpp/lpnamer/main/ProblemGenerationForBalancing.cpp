@@ -24,8 +24,17 @@ ProblemGenerationForBalancing::ProblemGenerationForBalancing(
     areas(areas),
     iterationsLogFileName(iterationsLogFileName)
 {
+    logger->display_message("Get candidates indices and marginal cost",
+                            LogUtils::LOGLEVEL::INFO,
+                            PROBLEM_GENERATION_LOGGER_CONTEXT);
     fillDispProdVarIndicesAndMarginalCosts();
+    logger->display_message("Get candidate bounds data",
+                            LogUtils::LOGLEVEL::INFO,
+                            PROBLEM_GENERATION_LOGGER_CONTEXT);
     setCapacitiesDataForCandidates();
+    logger->display_message("Initialize logs",
+                            LogUtils::LOGLEVEL::INFO,
+                            PROBLEM_GENERATION_LOGGER_CONTEXT);
     initializeOscillationRecords();
     initializeIterativeLogCSV();
 }
@@ -377,7 +386,6 @@ std::map<AreaCandidate, CapacityAction> ProblemGenerationForBalancing::findAreaC
         {
             continue;
         }
-
         std::optional<CapacityAction> action = determineCapacityAction(areaName,
                                                                        areaCriterionState,
                                                                        area);
@@ -859,8 +867,11 @@ std::shared_ptr<ProblemManager> ProblemGenerationForBalancing::updateProblems(
         }
     }
 
+    logger->display_message("Find areas candidate to modify",
+                            LogUtils::LOGLEVEL::INFO,
+                            PROBLEM_GENERATION_LOGGER_CONTEXT);
     const auto& areaCandidatesToModify = findAreaCandidatesToModify(simuValues);
-    // If no action available on all areas then the system is blocked
+    // If no action available on all areas then the run is stopped
     if (areaCandidatesToModify.empty())
     {
         logger->display_message(
@@ -869,6 +880,9 @@ std::shared_ptr<ProblemManager> ProblemGenerationForBalancing::updateProblems(
           PROBLEM_GENERATION_LOGGER_CONTEXT);
         blocked = true;
     }
+    logger->display_message("Apply action",
+                            LogUtils::LOGLEVEL::INFO,
+                            PROBLEM_GENERATION_LOGGER_CONTEXT);
     for (const auto& [areaCandidate, action]: areaCandidatesToModify)
     {
         double previousCandidateCapacity = getCandidateCurrentCapacity(areas,
