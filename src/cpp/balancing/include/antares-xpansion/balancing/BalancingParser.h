@@ -16,6 +16,33 @@ enum class CriterionState
     HIGHER,
     UNINITIALIZED,
 };
+
+enum class CapacityAction
+{
+    INVESTMENT,
+    DISINVESTMENT,
+    DECOMMISSIONING,
+    RECOMMISSIONING,
+    NOACTION
+};
+
+constexpr std::string_view to_string(CapacityAction action)
+{
+    switch (action)
+    {
+    case CapacityAction::INVESTMENT:
+        return "INVESTMENT";
+    case CapacityAction::DISINVESTMENT:
+        return "DISINVESTMENT";
+    case CapacityAction::DECOMMISSIONING:
+        return "DECOMMISSIONING";
+    case CapacityAction::RECOMMISSIONING:
+        return "RECOMMISSIONING";
+    case CapacityAction::NOACTION:
+        return "NOACTION";
+    }
+}
+
 using AreaCriterionData = std::pair<double, CriterionState>;
 
 constexpr std::string_view to_string(CriterionState state)
@@ -80,6 +107,7 @@ struct Area
     double currentDecommissioningIncrement;
     double investmentIncrement;
     double currentInvestmentIncrement;
+    CapacityAction lastAction = CapacityAction::NOACTION;
     int maxOscillation;
     std::map<std::string, Candidate<DecommissioningCandidateType>> decommissioningCandidates;
     std::map<std::string, Candidate<InvestmentCandidateType>> investmentCandidates;

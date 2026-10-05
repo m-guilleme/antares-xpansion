@@ -278,11 +278,8 @@ void ProblemGenerationForBalancing::saveCriterionAndAreaSettingsToIterativeLogCS
         // performed
         if (candidate.installedCapacity != candidate.previousInstalledCapacity)
         {
-            action = (lastActionForArea.find(areaName) != lastActionForArea.end())
-                       ? to_string(lastActionForArea.at(areaName))
-                       : "NO ACTION";
             file << iteration << "," << areaName << "," << to_string(criterionState) << ","
-                 << action << "," << candidateName << ","
+                 << to_string(areas.at(areaName).lastAction) << "," << candidateName << ","
                  << candidate.installedCapacity - candidate.previousInstalledCapacity << "\n";
         }
     };
@@ -414,18 +411,15 @@ std::optional<CapacityAction> ProblemGenerationForBalancing::determineCapacityAc
   CriterionState currentState,
   const Area& area) const
 {
-    std::optional<CapacityAction> previousAction;
-    if (lastActionForArea.find(areaName) != lastActionForArea.end())
-    {
-        previousAction = lastActionForArea.at(areaName);
-    }
+    std::optional<CapacityAction> lastAction;
+    lastAction = area.lastAction;
 
     const bool isHigher = currentState == CriterionState::HIGHER;
     // Investment cycle if the previous action was investment or disinvestment, or if it's the first
     // iteration and the criterion is higher than the target
-    const bool isInvestmentCycle = previousAction == CapacityAction::INVESTMENT
-                                   || previousAction == CapacityAction::DISINVESTMENT
-                                   || (!previousAction.has_value() && isHigher);
+    const bool isInvestmentCycle = lastAction == CapacityAction::INVESTMENT
+                                   || lastAction == CapacityAction::DISINVESTMENT
+                                   || (!lastAction.has_value() && isHigher);
 
     if (maxOscillationReached(areaName))
     {
@@ -487,8 +481,8 @@ std::optional<CapacityAction> ProblemGenerationForBalancing::determineCapacityAc
     std::ostringstream oss;
     oss << "Area " << areaName << " is not balanced but no modification is possible\n"
         << " Current criterion state: " << to_string(currentState) << "\n"
-        << " Previous action: "
-        << (previousAction.has_value() ? to_string(previousAction.value()) : "None") << "\n";
+        << " Previous action: " << (lastAction.has_value() ? to_string(lastAction.value()) : "None")
+        << "\n";
     logger->display_message(oss.str(),
                             LogUtils::LOGLEVEL::WARNING,
                             PROBLEM_GENERATION_LOGGER_CONTEXT);
@@ -762,11 +756,10 @@ void ProblemGenerationForBalancing::computeCandidateInstalledCapacity(
 void ProblemGenerationForBalancing::applyActionToCluster(const AreaCandidate& areaCandidate,
                                                          CapacityAction action)
 {
-    lastActionForArea[areaCandidate.first] = action;
-
     std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
 
     auto& area = areas.at(areaCandidate.first);
+    area.lastAction = action;
     computeCandidateInstalledCapacity(action, area, areaCandidate.second);
     double installedCapacity;
     if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)

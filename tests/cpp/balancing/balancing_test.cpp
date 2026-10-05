@@ -92,13 +92,11 @@ protected:
         pbg.getDecommissioningCandidate("decom_area", "candidate_2").installedCapacity = 1000;
         pbg.getDecommissioningCandidate("recom_area", "candidate_1").initInstalledCapacity = 1000;
         pbg.getDecommissioningCandidate("recom_area", "candidate_2").initInstalledCapacity = 1000;
-        // set pbg.lastActionForArea
-        std::map<std::string, CapacityAction> lastActionForArea = {
-          {"invest_area", CapacityAction::INVESTMENT},
-          {"desinvest_area", CapacityAction::INVESTMENT},
-          {"decom_area", CapacityAction::DECOMMISSIONING},
-          {"recom_area", CapacityAction::DECOMMISSIONING}};
-        pbg.lastActionForArea = lastActionForArea;
+        // set area lastAction
+        pbg.areas.at("invest_area").lastAction = CapacityAction::INVESTMENT;
+        pbg.areas.at("desinvest_area").lastAction = CapacityAction::INVESTMENT;
+        pbg.areas.at("decom_area").lastAction = CapacityAction::DECOMMISSIONING;
+        pbg.areas.at("recom_area").lastAction = CapacityAction::DECOMMISSIONING;
 
         // set pbg.area, probleManager.solutions_ and simuValues
         std::vector<double> solution(168 * 8);
@@ -509,7 +507,7 @@ protected:
         //  isInvestmentCycle
         if (setLastAction)
         {
-            pbg.lastActionForArea["area2"] = previousAreaAction;
+            pbg.areas.at("area2").lastAction = previousAreaAction;
         }
         // run determineCapacityAction
         std::optional<CapacityAction> resCapacityAction = pbg.determineCapacityAction(

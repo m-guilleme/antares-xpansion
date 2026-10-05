@@ -11,30 +11,7 @@
 
 using AreaCandidate = std::pair<std::string, std::string>;
 
-enum class CapacityAction
-{
-    INVESTMENT,
-    DISINVESTMENT,
-    DECOMMISSIONING,
-    RECOMMISSIONING
-};
-
 using OscillationStatus = std::pair<int, std::optional<CapacityAction>>;
-
-constexpr std::string_view to_string(CapacityAction action)
-{
-    switch (action)
-    {
-    case CapacityAction::INVESTMENT:
-        return "INVESTMENT";
-    case CapacityAction::DISINVESTMENT:
-        return "DISINVESTMENT";
-    case CapacityAction::DECOMMISSIONING:
-        return "DECOMMISSIONING";
-    case CapacityAction::RECOMMISSIONING:
-        return "RECOMMISSIONING";
-    }
-}
 
 /// @brief Class to generate and modify problems in memory
 class ProblemGenerationForBalancing: public ProblemGenerationOptimSimu
@@ -68,7 +45,6 @@ private:
     bool blocked = false;
     std::map<std::string, Area>& areas;
     std::map<AreaCandidate, OscillationStatus> oscillationRecords;
-    std::map<std::string, CapacityAction> lastActionForArea;
     std::filesystem::path iterationsLogFileName;
 
     double lowerThreshold(const Area& area) const
