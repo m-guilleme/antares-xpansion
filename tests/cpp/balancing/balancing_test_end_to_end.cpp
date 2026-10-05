@@ -164,7 +164,7 @@ protected:
         // to the problems)
         int iteration = -1;
         logger->display_message("Starting balancing process");
-        pbg.logCriterionAndAreaSettings(res);
+        pbg.logAreasView(res);
         while (!pbg.isBalanced() && !pbg.isBlocked() && iteration < max_iterations)
         {
             iteration++;
@@ -179,14 +179,14 @@ protected:
                                         directories.simulation_dir,
                                         8)
                     .ComputeCriterionAndPrice();
-            pbg.logCriterionAndAreaSettings(res);
+            pbg.logAreasView(res);
             logger->display_message("Iteration " + std::to_string(iteration) + " done.");
-            pbg.saveCriterionAndAreaSettingsToIterativeLogCSV(iteration);
+            pbg.saveIterativeAreasViewToCSV(iteration);
             pbg.updateAreaCriteriaData(res);
         };
         // saving final results
-        pbg.saveClusterResultsToCSV(directories.simulation_dir / "final_capacities.csv");
-        pbg.saveCriterionAndAreaSettingsToCSV(finalCriteriaFilePath);
+        pbg.saveCandidatesResultsToCSV(directories.simulation_dir / "final_capacities.csv");
+        pbg.saveAreasViewToCSV(finalCriteriaFilePath);
 
         // compare results to ref
         logger->display_message("\nComparing results files...");

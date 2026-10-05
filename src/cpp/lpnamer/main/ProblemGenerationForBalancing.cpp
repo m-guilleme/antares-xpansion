@@ -130,14 +130,14 @@ void ProblemGenerationForBalancing::setCapacityDataForOneCandidate(const std::st
 
 void ProblemGenerationForBalancing::setCapacitiesDataForCandidates()
 {
-    for (auto& [areaName, areaSetting]: areas)
+    for (auto& [areaName, area]: areas)
     {
-        for (auto& [candidateName, candidate]: areaSetting.investmentCandidates)
+        for (auto& [candidateName, candidate]: area.investmentCandidates)
         {
             setCapacityDataForOneCandidate(areaName, candidateName, candidate);
         }
 
-        for (auto& [candidateName, candidate]: areaSetting.decommissioningCandidates)
+        for (auto& [candidateName, candidate]: area.decommissioningCandidates)
         {
             setCapacityDataForOneCandidate(areaName, candidateName, candidate);
         }
@@ -200,7 +200,7 @@ void ProblemGenerationForBalancing::fillDispProdVarIndicesAndMarginalCosts()
     }
 }
 
-void ProblemGenerationForBalancing::logCriterionAndAreaSettings(
+void ProblemGenerationForBalancing::logAreasView(
   const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues) const
 {
     // For each area, log the criterion state and the DispatchableProduction variable values for the
@@ -259,8 +259,7 @@ void ProblemGenerationForBalancing::initializeIterativeLogCSV() const
     file << "iteration,zone,criteria,action,cluster candidate,capacity change\n";
 }
 
-void ProblemGenerationForBalancing::saveCriterionAndAreaSettingsToIterativeLogCSV(
-  int iteration) const
+void ProblemGenerationForBalancing::saveIterativeAreasViewToCSV(int iteration) const
 {
     std::ofstream file(iterationsLogFileName, std::ios_base::app);
     if (!file.is_open())
@@ -297,7 +296,7 @@ void ProblemGenerationForBalancing::saveCriterionAndAreaSettingsToIterativeLogCS
     }
 }
 
-void ProblemGenerationForBalancing::saveClusterResultsToCSV(
+void ProblemGenerationForBalancing::saveCandidatesResultsToCSV(
   const std::filesystem::path& outputPath) const
 {
     std::ofstream file(outputPath);
@@ -329,7 +328,7 @@ void ProblemGenerationForBalancing::saveClusterResultsToCSV(
     }
 }
 
-void ProblemGenerationForBalancing::saveCriterionAndAreaSettingsToCSV(
+void ProblemGenerationForBalancing::saveAreasViewToCSV(
   const std::filesystem::path& outputPath) const
 {
     std::ofstream file(outputPath);
@@ -411,15 +410,14 @@ std::optional<CapacityAction> ProblemGenerationForBalancing::determineCapacityAc
   CriterionState currentState,
   const Area& area) const
 {
-    std::optional<CapacityAction> lastAction;
-    lastAction = area.lastAction;
+    CapacityAction lastAction = area.lastAction;
 
     const bool isHigher = currentState == CriterionState::HIGHER;
     // Investment cycle if the previous action was investment or disinvestment, or if it's the first
     // iteration and the criterion is higher than the target
     const bool isInvestmentCycle = lastAction == CapacityAction::INVESTMENT
                                    || lastAction == CapacityAction::DISINVESTMENT
-                                   || (!lastAction.has_value() && isHigher);
+                                   || (lastAction == CapacityAction::NOACTION && isHigher);
 
     if (maxOscillationReached(areaName))
     {
@@ -481,7 +479,8 @@ std::optional<CapacityAction> ProblemGenerationForBalancing::determineCapacityAc
     std::ostringstream oss;
     oss << "Area " << areaName << " is not balanced but no modification is possible\n"
         << " Current criterion state: " << to_string(currentState) << "\n"
-        << " Previous action: " << (lastAction.has_value() ? to_string(lastAction.value()) : "None")
+        << " Previous action: "
+        << (area.lastAction == CapacityAction::NOACTION ? to_string(area.lastAction) : "None")
         << "\n";
     logger->display_message(oss.str(),
                             LogUtils::LOGLEVEL::WARNING,
@@ -920,14 +919,13 @@ bool ProblemGenerationForBalancing::isBlocked() const
 /// @brief Intialize oscillation records
 void ProblemGenerationForBalancing::initializeOscillationRecords()
 {
-    for (const auto& [areaName, areaSetting]: areas)
+    for (const auto& [areaName, area]: areas)
     {
-        for (const auto& [candidateName, investmentCandidate]: areaSetting.investmentCandidates)
+        for (const auto& [candidateName, investmentCandidate]: area.investmentCandidates)
         {
             oscillationRecords[{areaName, candidateName}] = {0, std::nullopt};
         }
-        for (const auto& [candidateName, decommissioningCandidate]:
-             areaSetting.decommissioningCandidates)
+        for (const auto& [candidateName, decommissioningCandidate]: area.decommissioningCandidates)
         {
             oscillationRecords[{areaName, candidateName}] = {0, std::nullopt};
         }
