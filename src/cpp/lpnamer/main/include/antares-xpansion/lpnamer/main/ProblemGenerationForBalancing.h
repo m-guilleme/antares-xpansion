@@ -11,8 +11,6 @@
 
 using AreaCandidate = std::pair<std::string, std::string>;
 
-using OscillationStatus = std::pair<int, std::optional<CapacityAction>>;
-
 /// @brief Class to generate and modify problems in memory
 class ProblemGenerationForBalancing: public ProblemGenerationOptimSimu
 {
@@ -43,7 +41,6 @@ public:
 private:
     bool blocked = false;
     std::map<std::string, Area>& areas;
-    std::map<AreaCandidate, OscillationStatus> oscillationRecords;
     std::filesystem::path iterationsLogFileName;
 
     double lowerThreshold(const Area& area) const
@@ -63,9 +60,6 @@ private:
                                         const std::string& candidateName,
                                         Candidate<T>& candidate);
     void setCapacitiesDataForCandidates();
-    void initializeOscillationRecords();
-    bool maxOscillationReached(const std::string& areaName) const;
-    void updateRecords(const AreaCandidate& areaCandidate, CapacityAction action);
     std::map<AreaCandidate, CapacityAction> findAreaCandidatesToModify(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);
     CriterionState computeCriterionState(const Area& area, double value) const;
@@ -78,7 +72,6 @@ private:
       CapacityAction action) const;
     void updateOldCriterionState();
     std::optional<CapacityAction> determineCapacityAction(const std::string& areaName,
-                                                          CriterionState currentState,
                                                           const Area& area) const;
     template<typename T>
     std::map<std::string, double> computeRentabilityForCandidates(

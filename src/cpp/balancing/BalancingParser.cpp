@@ -46,6 +46,30 @@ bool Area::isRecommissioningPossible() const
                                });
 }
 
+/// @brief Check if an area reachs max oscillation through one of their candidate
+/// @return true if the area has reached mas oscillation, false otherwise
+bool Area::maxOscillationReached() const
+{
+    bool maxOscillationReached = false;
+    for (const auto& [candidateName, candidate]: investmentCandidates)
+    {
+        if (candidate.oscillationCounter >= maxOscillation)
+        {
+            maxOscillationReached = true;
+            continue;
+        }
+    }
+    for (const auto& [candidateName, candidate]: decommissioningCandidates)
+    {
+        if (candidate.oscillationCounter >= maxOscillation)
+        {
+            maxOscillationReached = true;
+            continue;
+        }
+    }
+    return maxOscillationReached;
+}
+
 Candidate<InvestmentCandidateType>& Area::getInvestmentCandidate(const std::string& candidateName)
 {
     return investmentCandidates.at(candidateName);

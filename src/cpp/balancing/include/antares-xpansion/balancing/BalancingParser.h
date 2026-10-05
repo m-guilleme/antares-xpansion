@@ -22,8 +22,7 @@ enum class CapacityAction
     INVESTMENT,
     DISINVESTMENT,
     DECOMMISSIONING,
-    RECOMMISSIONING,
-    NOACTION
+    RECOMMISSIONING
 };
 
 constexpr std::string_view to_string(CapacityAction action)
@@ -38,12 +37,11 @@ constexpr std::string_view to_string(CapacityAction action)
         return "DECOMMISSIONING";
     case CapacityAction::RECOMMISSIONING:
         return "RECOMMISSIONING";
-    case CapacityAction::NOACTION:
-        return "NOACTION";
     }
 }
 
 using AreaCriterionData = std::pair<double, CriterionState>;
+using OscillationStatus = std::pair<int, std::optional<CapacityAction>>;
 
 constexpr std::string_view to_string(CriterionState state)
 {
@@ -88,6 +86,8 @@ struct Candidate
     double previousInstalledCapacity;
     double initInstalledCapacity;
     double marginalCost;
+    std::optional<CapacityAction> lastAction;
+    int oscillationCounter = 0;
     std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> dispProdVarIndices;
     std::map<Antares::Solver::WeeklyProblemId, std::vector<BoundData>> boundsData;
 
@@ -95,6 +95,15 @@ struct Candidate
                               std::vector<BoundData> oneWeekBoundsData)
     {
         boundsData[pbId] = oneWeekBoundsData;
+    }
+
+    void updateOscillationStatus(const CapacityAction& action)
+    {
+        if (lastAction.has_value() && action != lastAction)
+        {
+            oscillationCounter += 1;
+        }
+        lastAction = action;
     }
 };
 
@@ -107,7 +116,7 @@ struct Area
     double currentDecommissioningIncrement;
     double investmentIncrement;
     double currentInvestmentIncrement;
-    CapacityAction lastAction = CapacityAction::NOACTION;
+    std::optional<CapacityAction> lastAction;
     int maxOscillation;
     std::map<std::string, Candidate<DecommissioningCandidateType>> decommissioningCandidates;
     std::map<std::string, Candidate<InvestmentCandidateType>> investmentCandidates;
@@ -119,6 +128,7 @@ struct Area
     bool isDecommissioningPossible() const;
     bool isDisinvestmentPossible() const;
     bool isRecommissioningPossible() const;
+    bool maxOscillationReached() const;
     Candidate<InvestmentCandidateType>& getInvestmentCandidate(const std::string& candidateName);
     Candidate<DecommissioningCandidateType>& getDecommissioningCandidate(
       const std::string& candidateName);
