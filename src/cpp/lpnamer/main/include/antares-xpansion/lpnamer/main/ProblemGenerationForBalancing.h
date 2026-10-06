@@ -41,6 +41,7 @@ public:
 private:
     bool blocked = false;
     std::map<std::string, Area>& areas;
+    std::map<std::string, CapacityAction> areasAction;
     std::filesystem::path iterationsLogFileName;
 
     double lowerThreshold(const Area& area) const
@@ -65,20 +66,8 @@ private:
     CriterionState computeCriterionState(const Area& area, double value) const;
     void updateAreasIncrement();
     void applyActionToCluster(const AreaCandidate& areaCandidate, CapacityAction action);
-    std::string getBestCandidate(
-      const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues,
-      const std::string& areaName,
-      const Area& area,
-      CapacityAction action) const;
     void updateOldCriterionState();
-    std::optional<CapacityAction> determineCapacityAction(const std::string& areaName,
-                                                          const Area& area) const;
-    template<typename T>
-    std::map<std::string, double> computeRentabilityForCandidates(
-      const std::string& areaName,
-      const std::map<std::string, Candidate<T>>& candidates,
-      const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues,
-      CapacityAction action) const;
+    std::optional<CapacityAction> determineCapacityAction(const Area& area) const;
     template<typename T>
     void fillDispProdVarIndicesAndMarginalCostsForArea(
       const std::string& areaName,

@@ -308,8 +308,9 @@ protected:
     {
         std::string studyName = "with_decom_candidate";
         std::string areaName = "area2";
-        std::string candidateName = action == CapacityAction::INVESTMENT ? "invest_peak2"
-                                                                         : "unprofitable_peak";
+        const bool isInvestmentAction = action == CapacityAction::INVESTMENT
+                                        || action == CapacityAction::DISINVESTMENT;
+        std::string candidateName = isInvestmentAction ? "invest_peak2" : "unprofitable_peak";
         // copy dummy data
         copyStudyData(studyName);
 
@@ -337,12 +338,15 @@ protected:
 
         // set test data
         // set investment cost and fixed om cost
-        if (action == CapacityAction::INVESTMENT)
+        std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
+        if (isInvestmentAction)
         {
             auto& candidate = pbg.getInvestmentCandidate(areaName, candidateName);
             candidate.installedCapacity = installedCapacity;
             candidate.type->investmentCost = investmentCost;
             candidate.type->fixedOmCosts = fixedOmCosts;
+            candidate.marginalCost = marginalCost;
+            varIndices = candidate.dispProdVarIndices;
         }
         else
         {
@@ -350,25 +354,13 @@ protected:
             candidate.installedCapacity = installedCapacity;
             candidate.type->decommissioningCost = investmentCost;
             candidate.type->fixedOmCosts = fixedOmCosts;
+            candidate.marginalCost = marginalCost;
+            varIndices = candidate.dispProdVarIndices;
         }
         // set probleManager.solutions_
         Antares::Solver::WeeklyProblemId pbId({1, 1});
         // set arbitrary size of solution big enough to cover candidate indices in each study
         std::vector<double> solution(3100, 0);
-
-        std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
-        if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
-        {
-            auto& candidate = pbg.getInvestmentCandidate(areaName, candidateName);
-            candidate.marginalCost = marginalCost;
-            varIndices = candidate.dispProdVarIndices;
-        }
-        else
-        {
-            auto& candidate = pbg.getDecommissioningCandidate(areaName, candidateName);
-            candidate.marginalCost = marginalCost;
-            varIndices = candidate.dispProdVarIndices;
-        }
         for (const auto& idx: varIndices)
         {
             solution.at(idx) = hourlySolutionValue;
@@ -384,26 +376,40 @@ protected:
         pbOutput.areaPrices[areaName] = areaPrices;
         std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues = {{pbId, pbOutput}};
         // run computeRentabilityForCandidates
-        std::map<std::string, double> rentability;
-        if (action == CapacityAction::INVESTMENT)
+        Area area = pbg.areas.at(areaName);
+        if (isInvestmentAction)
         {
-            rentability = pbg.computeRentabilityForCandidates(
-              areaName,
-              pbg.areas.at(areaName).investmentCandidates,
-              simuValues,
-              action);
+            area.initializeRentability(area.investmentCandidates, action);
         }
         else
         {
-            rentability = pbg.computeRentabilityForCandidates(
-              areaName,
-              pbg.areas.at(areaName).decommissioningCandidates,
-              simuValues,
-              action);
+            area.initializeRentability(area.decommissioningCandidates, action);
         }
+        area.updateRentabilityWithProblem(action,
+                                          pbg.problemManager->getProblemFromId(pbId),
+                                          pbOutput,
+                                          solution);
+
+        // std::map<std::string, double> rentability;
+        // if (action == CapacityAction::INVESTMENT)
+        // {
+        //     rentability = pbg.computeRentabilityForCandidates(
+        //       areaName,
+        //       pbg.areas.at(areaName).investmentCandidates,
+        //       simuValues,
+        //       action);
+        // }
+        // else
+        // {
+        //     rentability = pbg.computeRentabilityForCandidates(
+        //       areaName,
+        //       pbg.areas.at(areaName).decommissioningCandidates,
+        //       simuValues,
+        //       action);
+        // }
         // assert results
         // we check that the rentability have been correctly computed
-        EXPECT_TRUE(rentability.at(candidateName) == expectedRentability);
+        EXPECT_TRUE(area.candidatesRentability.at(candidateName) == expectedRentability);
     }
 
     void testGetNullRentabilityForCandidates(const std::string& studyFolderName,
@@ -441,33 +447,27 @@ protected:
         std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues = {{pbId, pbOutput}};
         // set candidate capacity data and run computeRentabilityForCandidates
         std::map<std::string, double> rentability;
+        Area area = pbg.areas.at(areaName);
         if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
         {
-            auto& candidate = pbg.getInvestmentCandidate(areaName, candidateName);
+            auto& candidate = area.getInvestmentCandidate(candidateName);
             candidate.installedCapacity = capacityValue;
             candidate.initInstalledCapacity = capacityValue;
             candidate.type->expansionPotential = capacityValue;
-            rentability = pbg.computeRentabilityForCandidates(
-              areaName,
-              pbg.areas.at(areaName).investmentCandidates,
-              simuValues,
-              action);
+            area.initializeRentability(area.investmentCandidates, action);
         }
         else
         {
-            auto& candidate = pbg.getDecommissioningCandidate(areaName, candidateName);
+            auto& candidate = area.getDecommissioningCandidate(candidateName);
             candidate.installedCapacity = capacityValue;
             candidate.initInstalledCapacity = capacityValue;
             candidate.type->decommissioningPotential = capacityValue;
-            rentability = pbg.computeRentabilityForCandidates(
-              areaName,
-              pbg.areas.at(areaName).decommissioningCandidates,
-              simuValues,
-              action);
+            area.initializeRentability(area.decommissioningCandidates, action);
         }
+
         // assert results
         // we check that the candidate has been correctly excluded from the selection
-        EXPECT_TRUE(rentability.empty());
+        EXPECT_TRUE(area.candidatesRentability.empty());
     }
 
     void testDetermineCapacityAction(const double initInstalledCapacity,
@@ -504,6 +504,7 @@ protected:
         auto& decomCandidate = pbg.getDecommissioningCandidate("area2", "unprofitable_peak");
         decomCandidate.initInstalledCapacity = initInstalledCapacity;
         decomCandidate.type->decommissioningPotential = decommissioningPotential;
+        pbg.areas.at("area2").criterionState = criterionState;
         //  isInvestmentCycle
         if (setLastAction)
         {
@@ -511,8 +512,6 @@ protected:
         }
         // run determineCapacityAction
         std::optional<CapacityAction> resCapacityAction = pbg.determineCapacityAction(
-          "area2",
-          criterionState,
           pbg.areas.at("area2"));
         // assert results
         // we check that the correct action has been selected
@@ -527,7 +526,7 @@ TEST_F(BalancingTest, findAreaCandidatesToModify)
 
 TEST_F(BalancingTest, applyInvestmentActionToClusterWithUpperonlyBound)
 {
-    logger->display_message("Testing of applyActionToCluster with INVESTMENT and UpperOnly bound");
+    logger->display_message("Testing of applyActionToCluster with INVESTMENT and UpperOnly bound ");
     testApplyActionToCluster("area2",
                              "invest_semibase",
                              CapacityAction::INVESTMENT,

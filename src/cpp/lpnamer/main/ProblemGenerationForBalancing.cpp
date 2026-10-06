@@ -365,60 +365,29 @@ void ProblemGenerationForBalancing::saveAreasViewToCSV(
     }
 }
 
-/// @brief Find the action to apply for each area candidates
-/// @param simuValues The simulation values to use for the problems modification
-/// @return A map associating selected area candidate to their action
-std::map<AreaCandidate, CapacityAction> ProblemGenerationForBalancing::findAreaCandidatesToModify(
-  const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues)
-{
-    std::map<AreaCandidate, CapacityAction> areaCandidatesToModify;
-    updateAreasIncrement();
-
-    for (const auto& [areaName, area]: areas)
-    {
-        if (area.criterionState == CriterionState::VALID)
-        {
-            continue;
-        }
-        std::optional<CapacityAction> action = determineCapacityAction(areaName, area);
-        // if no action possible, no candidate will be modified
-        if (action.has_value())
-        {
-            const std::string candidateName = getBestCandidate(simuValues,
-                                                               areaName,
-                                                               area,
-                                                               action.value());
-            areaCandidatesToModify[{areaName, candidateName}] = action.value();
-        }
-    }
-
-    updateOldCriterionState();
-    return areaCandidatesToModify;
-}
-
 /// @brief Find the action to apply from the criterion states and area investment parameters
 /// @param areaName The name of the area
 /// @param currentState The current criterion state
 /// @param area The area investment parameters
 /// @return The action to apply
 std::optional<CapacityAction> ProblemGenerationForBalancing::determineCapacityAction(
-  const std::string& areaName,
   const Area& area) const
 {
     std::optional<CapacityAction> lastAction = area.lastAction;
     CriterionState currentState = area.criterionState;
     const bool isHigher = currentState == CriterionState::HIGHER;
-    // Investment cycle if the previous action was investment or disinvestment, or if it's the first
-    // iteration and the criterion is higher than the target
-    const bool isInvestmentCycle = lastAction == CapacityAction::INVESTMENT
-                                   || lastAction == CapacityAction::DISINVESTMENT
-                                   || (!lastAction.has_value() && isHigher);
+    // Investment cycle if the previous action was investment or disinvestment, or if it's the
+    // first iteration and the criterion is higher than the target
+    const bool isInvestmentCycle = !lastAction.has_value()
+                                     ? isHigher
+                                     : lastAction.value() == CapacityAction::INVESTMENT
+                                         || lastAction.value() == CapacityAction::DISINVESTMENT;
 
     if (area.maxOscillationReached())
     {
         // if no action is possible: logging a warning and carrying on
         std::ostringstream oss;
-        oss << "No action in area " << areaName << " because max oscillation has been reached";
+        oss << "No action in area " << area.name << " because max oscillation has been reached";
         logger->display_message(oss.str(),
                                 LogUtils::LOGLEVEL::INFO,
                                 PROBLEM_GENERATION_LOGGER_CONTEXT);
@@ -472,7 +441,7 @@ std::optional<CapacityAction> ProblemGenerationForBalancing::determineCapacityAc
 
     // if no action is possible: logging a warning and carrying on
     std::ostringstream oss;
-    oss << "Area " << areaName << " is not balanced but no modification is possible\n"
+    oss << "Area " << area.name << " is not balanced but no modification is possible\n"
         << " Current criterion state: " << to_string(currentState) << "\n"
         << " Previous action: "
         << (area.lastAction.has_value() ? to_string(area.lastAction.value()) : "None") << "\n";
@@ -480,129 +449,6 @@ std::optional<CapacityAction> ProblemGenerationForBalancing::determineCapacityAc
                             LogUtils::LOGLEVEL::WARNING,
                             PROBLEM_GENERATION_LOGGER_CONTEXT);
     return std::nullopt;
-}
-
-template<typename T>
-static double extraCost(const Candidate<T>& candidate)
-{
-    if constexpr (std::is_same_v<T, InvestmentCandidateType>)
-    {
-        return candidate.installedCapacity
-               * (candidate.type->investmentCost + candidate.type->fixedOmCosts);
-    }
-    else
-    {
-        return candidate.installedCapacity
-               * (candidate.type->decommissioningCost + candidate.type->fixedOmCosts);
-    }
-}
-
-template<typename T>
-std::map<std::string, double> ProblemGenerationForBalancing::computeRentabilityForCandidates(
-  const std::string& areaName,
-  const std::map<std::string, Candidate<T>>& candidates,
-  const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues,
-  CapacityAction action) const
-{
-    std::map<std::string, double> rentability;
-    for (const auto& [candidateName, candidate]: candidates)
-    {
-        double value = 0.0;
-        if constexpr (std::is_same_v<T, InvestmentCandidateType>)
-        {
-            if (action == CapacityAction::INVESTMENT
-                && candidate.installedCapacity == candidate.type->expansionPotential)
-            {
-                continue;
-            }
-            else if (action == CapacityAction::DISINVESTMENT
-                     && candidate.installedCapacity == candidate.initInstalledCapacity)
-            {
-                continue;
-            }
-        }
-        else
-        {
-            if (action == CapacityAction::DECOMMISSIONING
-                && candidate.installedCapacity == candidate.type->decommissioningPotential)
-            {
-                continue;
-            }
-            else if (action == CapacityAction::RECOMMISSIONING
-                     && candidate.installedCapacity == candidate.initInstalledCapacity)
-            {
-                continue;
-            }
-        }
-        double production(0.0);
-        double marginalCost = candidate.marginalCost;
-        for (const auto& [pbId, pbOutput]: simuValues)
-        {
-            const auto& dispProdVarIndices = candidate.dispProdVarIndices;
-            // production is fetched from values resulting of the optimization
-            std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
-            auto solution = problemManager->getProblemSolution(pbId, problem);
-
-            for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
-            {
-                production = solution.at(dispProdVarIndices.at(hour));
-                value += (pbOutput.areaPrices.at(areaName).at(hour) - marginalCost) * production;
-            }
-        }
-        value -= extraCost(candidate);
-        rentability[candidateName] = value;
-    }
-    return rentability;
-}
-
-static bool shouldSelectMaxRentability(CapacityAction action)
-{
-    return action == CapacityAction::INVESTMENT || action == CapacityAction::RECOMMISSIONING;
-}
-
-static std::string selectBestClusterFromRentability(
-  const std::map<std::string, double>& rentability,
-  CapacityAction action)
-{
-    const auto valueOf = [](const auto& entry) { return entry.second; };
-    const auto best = shouldSelectMaxRentability(action)
-                        ? std::ranges::max_element(rentability, {}, valueOf)
-                        : std::ranges::min_element(rentability, {}, valueOf);
-    return best->first;
-}
-
-/// @brief Find the best candidate for a given area
-/// @param simuValues The simulation values to look for the cluster candidate selection
-/// @param areaName The name of the area to find the best candidate for
-/// @param area The area investment parameters
-/// @param action The action to apply for which the best candidate is looked for
-/// @return The name of the best candidate for the given area and action
-std::string ProblemGenerationForBalancing::getBestCandidate(
-  const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues,
-  const std::string& areaName,
-  const Area& area,
-  CapacityAction action) const
-{
-    const bool isInvestmentAction = action == CapacityAction::INVESTMENT
-                                    || action == CapacityAction::DISINVESTMENT;
-
-    std::map<std::string, double> rentability;
-    if (isInvestmentAction)
-    {
-        rentability = computeRentabilityForCandidates(areaName,
-                                                      area.investmentCandidates,
-                                                      simuValues,
-                                                      action);
-    }
-    else
-    {
-        rentability = computeRentabilityForCandidates(areaName,
-                                                      area.decommissioningCandidates,
-                                                      simuValues,
-                                                      action);
-    }
-
-    return selectBestClusterFromRentability(rentability, action);
 }
 
 /// @brief Update the the area investment increments based on the criterion states
@@ -634,6 +480,61 @@ void ProblemGenerationForBalancing::updateOldCriterionState()
     {
         area.oldCriterionState = area.criterionState;
     }
+}
+
+/// @brief Find the action to apply for each area candidates
+/// @param simuValues The simulation values to use for the problems modification
+/// @return A map associating selected area candidate to their action
+std::map<AreaCandidate, CapacityAction> ProblemGenerationForBalancing::findAreaCandidatesToModify(
+  const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues)
+{
+    std::map<AreaCandidate, CapacityAction> areaCandidatesToModify;
+    // reset Action on the areas
+    areasAction.clear();
+    updateAreasIncrement();
+
+    for (auto& [areaName, area]: areas)
+    {
+        if (area.criterionState == CriterionState::VALID)
+        {
+            continue;
+        }
+        std::optional<CapacityAction> action = determineCapacityAction(area);
+        // if no action possible, no candidate will be modified
+        if (action.has_value())
+        {
+            areasAction[areaName] = action.value();
+            const bool isInvestmentAction = action == CapacityAction::INVESTMENT
+                                            || action == CapacityAction::DISINVESTMENT;
+            if (isInvestmentAction)
+            {
+                area.initializeRentability(area.investmentCandidates, action.value());
+            }
+            else
+            {
+                area.initializeRentability(area.decommissioningCandidates, action.value());
+            }
+        }
+    }
+
+    for (const auto& [pbId, pbOutput]: simuValues)
+    {
+        std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
+        std::vector<double> solution = problemManager->getProblemSolution(pbId, problem);
+
+        for (const auto& [areaName, action]: areasAction)
+        {
+            areas.at(areaName).updateRentabilityWithProblem(action, problem, pbOutput, solution);
+        }
+    }
+
+    for (const auto& [areaName, action]: areasAction)
+    {
+        std::string candidateName = areas.at(areaName).selectBestClusterFromRentability(action);
+        areaCandidatesToModify[{areaName, candidateName}] = action;
+    }
+    updateOldCriterionState();
+    return areaCandidatesToModify;
 }
 
 /// @brief Compute the criterion state from the area investment parameters and the criterion

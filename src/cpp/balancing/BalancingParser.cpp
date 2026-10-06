@@ -81,6 +81,68 @@ Candidate<DecommissioningCandidateType>& Area::getDecommissioningCandidate(
     return decommissioningCandidates.at(candidateName);
 }
 
+/// @brief Find the best candidate for a given area
+/// @param simuValues The simulation values to look for the cluster candidate selection
+/// @param areaName The name of the area to find the best candidate for
+/// @param area The area investment parameters
+/// @param action The action to apply for which the best candidate is looked for
+void Area::updateRentabilityWithProblem(const CapacityAction action,
+                                        const std::shared_ptr<Problem> problem,
+                                        const PbOutput pbOutput,
+                                        const std::vector<double> solution)
+{
+    const bool isInvestmentAction = action == CapacityAction::INVESTMENT
+                                    || action == CapacityAction::DISINVESTMENT;
+    if (isInvestmentAction)
+    {
+        computeRentabilityForCandidates(investmentCandidates, action, problem, pbOutput, solution);
+    }
+    else
+    {
+        computeRentabilityForCandidates(decommissioningCandidates,
+                                        action,
+                                        problem,
+                                        pbOutput,
+                                        solution);
+    }
+}
+
+template<typename T>
+void Area::computeRentabilityForCandidates(const std::map<std::string, Candidate<T>>& candidates,
+                                           const CapacityAction action,
+                                           const std::shared_ptr<Problem> problem,
+                                           const PbOutput pbOutput,
+                                           const std::vector<double> solution)
+{
+    for (auto& [candidateName, rentability]: candidatesRentability)
+    {
+        double production(0.0);
+        Candidate<T> candidate = candidates.at(candidateName);
+        double marginalCost = candidate.marginalCost;
+        const auto& dispProdVarIndices = candidate.dispProdVarIndices;
+
+        for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+        {
+            production = solution.at(dispProdVarIndices.at(hour));
+            rentability += (pbOutput.areaPrices.at(name).at(hour) - marginalCost) * production;
+        }
+    }
+}
+
+static bool shouldSelectMaxRentability(CapacityAction action)
+{
+    return action == CapacityAction::INVESTMENT || action == CapacityAction::RECOMMISSIONING;
+}
+
+std::string Area::selectBestClusterFromRentability(CapacityAction action)
+{
+    const auto valueOf = [](const auto& entry) { return entry.second; };
+    const auto best = shouldSelectMaxRentability(action)
+                        ? std::ranges::max_element(candidatesRentability, {}, valueOf)
+                        : std::ranges::min_element(candidatesRentability, {}, valueOf);
+    return best->first;
+}
+
 /// @brief Constructor of the BalancingParser class
 /// @param pathToYamlConfigFile The path to the YAML configuration file
 BalancingParser::BalancingParser(const std::filesystem::path& pathToYamlConfigFile):
@@ -286,6 +348,7 @@ void BalancingParser::parseAreasSettings()
         requireField(areaData, "max_oscillation", context);
 
         Area area;
+        area.name = areaName;
         area.reliabilityStandard = areaData["reliability_standard"].as<double>();
         area.decommissioningIncrement = areaData["decommissioning_increment"].as<double>();
         area.currentDecommissioningIncrement = area.decommissioningIncrement;

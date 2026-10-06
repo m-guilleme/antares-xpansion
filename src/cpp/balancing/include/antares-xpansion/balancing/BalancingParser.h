@@ -7,8 +7,17 @@
 #include <antares/api/solver.h>
 
 #include "antares-xpansion/benders/benders_core/CriterionInputDataReader.h"
+#include "antares-xpansion/lpnamer/model/Problem.h"
 
 constexpr int NUMBER_OF_HOURS_PER_WEEK = 168;
+
+struct PbOutput
+{
+    std::map<std::string, int> areaCriterionValues{};
+    std::map<std::string, std::array<double, NUMBER_OF_HOURS_PER_WEEK>>
+      areaPrices{}; // Dual value of AreaBalance Constraint
+};
+
 enum class CriterionState
 {
     LOWER,
@@ -117,12 +126,14 @@ struct Area
     double investmentIncrement;
     double currentInvestmentIncrement;
     std::optional<CapacityAction> lastAction;
+    std::string name;
     int maxOscillation;
     std::map<std::string, Candidate<DecommissioningCandidateType>> decommissioningCandidates;
     std::map<std::string, Candidate<InvestmentCandidateType>> investmentCandidates;
+    std::map<std::string, double> candidatesRentability;
     CriterionState oldCriterionState{CriterionState::UNINITIALIZED};
-    double avgCriteria;
     CriterionState criterionState{CriterionState::UNINITIALIZED};
+    double avgCriteria;
 
     bool isInvestmentPossible() const;
     bool isDecommissioningPossible() const;
@@ -132,6 +143,70 @@ struct Area
     Candidate<InvestmentCandidateType>& getInvestmentCandidate(const std::string& candidateName);
     Candidate<DecommissioningCandidateType>& getDecommissioningCandidate(
       const std::string& candidateName);
+    void updateRentabilityWithProblem(const CapacityAction action,
+                                      const std::shared_ptr<Problem> problem,
+                                      const PbOutput pbOutput,
+                                      const std::vector<double> solution);
+    template<typename T>
+    void computeRentabilityForCandidates(const std::map<std::string, Candidate<T>>& candidates,
+                                         const CapacityAction action,
+                                         const std::shared_ptr<Problem> problem,
+                                         const PbOutput pbOutput,
+                                         const std::vector<double> solution);
+    std::string selectBestClusterFromRentability(CapacityAction action);
+
+    template<typename T>
+    double extraCost(const Candidate<T>& candidate)
+    {
+        if constexpr (std::is_same_v<T, InvestmentCandidateType>)
+        {
+            return candidate.installedCapacity
+                   * (candidate.type->investmentCost + candidate.type->fixedOmCosts);
+        }
+        else
+        {
+            return candidate.installedCapacity
+                   * (candidate.type->decommissioningCost + candidate.type->fixedOmCosts);
+        }
+    }
+
+    template<typename T>
+    void initializeRentability(const std::map<std::string, Candidate<T>>& candidates,
+                               const CapacityAction& action)
+    {
+        candidatesRentability.clear();
+        for (const auto& [candidateName, candidate]: candidates)
+        {
+            double value = 0.0;
+            if constexpr (std::is_same_v<T, InvestmentCandidateType>)
+            {
+                if (action == CapacityAction::INVESTMENT
+                    && candidate.installedCapacity == candidate.type->expansionPotential)
+                {
+                    continue;
+                }
+                else if (action == CapacityAction::DISINVESTMENT
+                         && candidate.installedCapacity == candidate.initInstalledCapacity)
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                if (action == CapacityAction::DECOMMISSIONING
+                    && candidate.installedCapacity == candidate.type->decommissioningPotential)
+                {
+                    continue;
+                }
+                else if (action == CapacityAction::RECOMMISSIONING
+                         && candidate.installedCapacity == candidate.initInstalledCapacity)
+                {
+                    continue;
+                }
+            }
+            candidatesRentability[candidateName] -= extraCost(candidate);
+        }
+    }
 };
 
 class BalancingParser

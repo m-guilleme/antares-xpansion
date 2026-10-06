@@ -5,19 +5,11 @@
 #include "antares-xpansion/balancing/BalancingParser.h"
 #include "antares-xpansion/benders/benders_core/CriterionComputation.h"
 #include "antares-xpansion/evaluator/Evaluator.h"
-#include "antares-xpansion/lpnamer/model/Problem.h"
 #include "antares-xpansion/xpansion_interfaces/ILogger.h"
 
 constexpr char BALANCING_EVALUATOR_LOGGER_CONTEXT[] = "GreedyBalancingFinder";
 
 using namespace PlainData;
-
-struct PbOutput
-{
-    std::map<std::string, int> areaCriterionValues{};
-    std::map<std::string, std::array<double, NUMBER_OF_HOURS_PER_WEEK>>
-      areaPrices{}; // Dual value of AreaBalance Constraint
-};
 
 class GreedyBalancingFinder: public Evaluator
 {
