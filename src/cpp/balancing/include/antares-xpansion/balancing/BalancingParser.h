@@ -100,6 +100,31 @@ struct Candidate
     std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> dispProdVarIndices;
     std::map<Antares::Solver::WeeklyProblemId, std::vector<BoundData>> boundsData;
 
+    void setOneWeekCapacityData(Antares::Solver::WeeklyProblemId pbId,
+                                std::shared_ptr<Problem> problem)
+    {
+        std::vector<BoundData> oneWeekBoundsData(NUMBER_OF_HOURS_PER_WEEK);
+        for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+        {
+            double upperBound;
+            double lowerBound;
+            problem->get_ub(&upperBound, dispProdVarIndices[hour], dispProdVarIndices[hour]);
+            problem->get_lb(&lowerBound, dispProdVarIndices[hour], dispProdVarIndices[hour]);
+            oneWeekBoundsData[hour].lowBoundRatioToUpBound = upperBound > 0.0
+                                                               ? lowerBound / upperBound
+                                                               : 0.0;
+            // if both bound are equal to 0.0 we set as upperonly
+            oneWeekBoundsData[hour].upBoundRatioToInstalledCap = upperBound;
+            if (upperBound > installedCapacity)
+            {
+                installedCapacity = upperBound;
+                previousInstalledCapacity = upperBound;
+                initInstalledCapacity = upperBound;
+            }
+        }
+        setOneWeekBoundsData(pbId, oneWeekBoundsData);
+    }
+
     void setOneWeekBoundsData(Antares::Solver::WeeklyProblemId pbId,
                               std::vector<BoundData> oneWeekBoundsData)
     {

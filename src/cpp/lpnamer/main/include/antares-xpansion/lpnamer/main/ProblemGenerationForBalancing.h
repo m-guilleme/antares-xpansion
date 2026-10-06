@@ -56,10 +56,6 @@ private:
 
     void initializeIterativeLogCSV() const;
     void fillDispProdVarIndicesAndMarginalCosts();
-    template<typename T>
-    void setCapacityDataForOneCandidate(const std::string& areaName,
-                                        const std::string& candidateName,
-                                        Candidate<T>& candidate);
     void setCapacitiesDataForCandidates();
     std::map<AreaCandidate, CapacityAction> findAreaCandidatesToModify(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);

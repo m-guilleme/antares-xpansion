@@ -78,69 +78,56 @@ void ProblemGenerationForBalancing::fillDispProdVarIndicesAndMarginalCostsForAre
     }
 }
 
-template<typename T>
-void ProblemGenerationForBalancing::setCapacityDataForOneCandidate(const std::string& areaName,
-                                                                   const std::string& candidateName,
-                                                                   Candidate<T>& candidate)
+void finalizeCandidatesCapacityData(std::map<std::string, Area>& areas)
 {
-    const auto& dispProdVarIndices = candidate.dispProdVarIndices;
-    double installedCapacity = 0.0;
-    for (const auto& pbId: problemManager->getProblemIds())
+    auto updateUpBoundRatioToInstalledCap = [&]<typename T>(Candidate<T>& candidate)
     {
-        std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
-        std::vector<BoundData> oneWeekBoundsData(NUMBER_OF_HOURS_PER_WEEK);
-        for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+        for (auto& [pbId, oneWeekBoundData]: candidate.boundsData)
         {
-            double upperBound;
-            double lowerBound;
-            problem->get_ub(&upperBound, dispProdVarIndices[hour], dispProdVarIndices[hour]);
-            problem->get_lb(&lowerBound, dispProdVarIndices[hour], dispProdVarIndices[hour]);
-            oneWeekBoundsData[hour].lowBoundRatioToUpBound = upperBound > 0.0
-                                                               ? lowerBound / upperBound
-                                                               : 0.0;
-            // if both bound are equal to 0.0 we set as upperonly
-            oneWeekBoundsData[hour].upBoundRatioToInstalledCap = upperBound;
-            if (upperBound > installedCapacity)
+            for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
             {
-                installedCapacity = upperBound;
+                oneWeekBoundData[hour].upBoundRatioToInstalledCap
+                  = oneWeekBoundData[hour].upBoundRatioToInstalledCap == candidate.installedCapacity
+                      ? 1.
+                    : candidate.installedCapacity > 0.0
+                      ? oneWeekBoundData[hour].upBoundRatioToInstalledCap
+                          / candidate.installedCapacity
+                      : 0.0;
             }
         }
-        candidate.setOneWeekBoundsData(pbId, oneWeekBoundsData);
     };
-    for (auto& [pbId, oneWeekBoundData]: candidate.boundsData)
-    {
-        for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
-        {
-            oneWeekBoundData[hour].upBoundRatioToInstalledCap = oneWeekBoundData[hour]
-                                                                      .upBoundRatioToInstalledCap
-                                                                    == installedCapacity
-                                                                  ? 1.
-                                                                : installedCapacity > 0.0
-                                                                  ? oneWeekBoundData[hour]
-                                                                        .upBoundRatioToInstalledCap
-                                                                      / installedCapacity
-                                                                  : 0.0;
-        }
-    }
-    candidate.installedCapacity = installedCapacity;
-    candidate.previousInstalledCapacity = installedCapacity;
-    candidate.initInstalledCapacity = installedCapacity;
-}
-
-void ProblemGenerationForBalancing::setCapacitiesDataForCandidates()
-{
     for (auto& [areaName, area]: areas)
     {
         for (auto& [candidateName, candidate]: area.investmentCandidates)
         {
-            setCapacityDataForOneCandidate(areaName, candidateName, candidate);
+            updateUpBoundRatioToInstalledCap(candidate);
         }
-
         for (auto& [candidateName, candidate]: area.decommissioningCandidates)
         {
-            setCapacityDataForOneCandidate(areaName, candidateName, candidate);
+            updateUpBoundRatioToInstalledCap(candidate);
         }
     }
+}
+
+void ProblemGenerationForBalancing::setCapacitiesDataForCandidates()
+{
+    for (const auto& pbId: problemManager->getProblemIds())
+    {
+        std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
+        for (auto& [areaName, area]: areas)
+        {
+            for (auto& [candidateName, candidate]: area.investmentCandidates)
+            {
+                candidate.setOneWeekCapacityData(pbId, problem);
+            }
+
+            for (auto& [candidateName, candidate]: area.decommissioningCandidates)
+            {
+                candidate.setOneWeekCapacityData(pbId, problem);
+            }
+        }
+    }
+    finalizeCandidatesCapacityData(areas);
 }
 
 static std::unordered_map<std::string, size_t> buildVarToIndex(const std::vector<std::string>& vars)
