@@ -387,10 +387,7 @@ protected:
         {
             area.initializeRentability(area.decommissioningCandidates, action);
         }
-        area.updateRentabilityWithProblem(action,
-                                          pbg.problemManager->getProblemFromId(pbId),
-                                          pbOutput,
-                                          solution);
+        area.updateRentabilityWithProblem(action, pbOutput, solution);
 
         // std::map<std::string, double> rentability;
         // if (action == CapacityAction::INVESTMENT)

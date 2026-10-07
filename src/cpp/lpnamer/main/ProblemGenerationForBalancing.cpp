@@ -506,12 +506,11 @@ std::map<AreaCandidate, CapacityAction> ProblemGenerationForBalancing::findAreaC
 
     for (const auto& [pbId, pbOutput]: simuValues)
     {
-        std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
-        std::vector<double> solution = problemManager->getProblemSolution(pbId, problem);
+        std::vector<double> solution = problemManager->getProblemSolution(pbId);
 
         for (const auto& [areaName, action]: areasAction)
         {
-            areas.at(areaName).updateRentabilityWithProblem(action, problem, pbOutput, solution);
+            areas.at(areaName).updateRentabilityWithProblem(action, pbOutput, solution);
         }
     }
 
@@ -798,26 +797,30 @@ std::shared_ptr<ProblemManager> ProblemGenerationForBalancing::updateProblems(
                             LogUtils::LOGLEVEL::INFO,
                             PROBLEM_GENERATION_LOGGER_CONTEXT);
 
+    std::map<AreaCandidate, double> previousCandidateCapacity;
+    for (const auto& [areaCandidate, action]: areaCandidatesToModify)
+    {
+        previousCandidateCapacity[areaCandidate] = getCandidateCurrentCapacity(areas,
+                                                                               action,
+                                                                               areaCandidate);
+    }
     applyActionToCandidate(areaCandidatesToModify);
 
     for (const auto& [areaCandidate, action]: areaCandidatesToModify)
     {
-        double previousCandidateCapacity = getCandidateCurrentCapacity(areas,
-                                                                       action,
-                                                                       areaCandidate);
         double newCandidateCapacity = getCandidateCurrentCapacity(areas, action, areaCandidate);
-        logger->display_message((std::stringstream()
-                                 << " Area: " << areaCandidate.first
-                                 << " criteria: " << areas.at(areaCandidate.first).avgCriteria
-                                 << " [" << lowerThreshold(areas.at(areaCandidate.first)) << "-"
-                                 << higherThreshold(areas.at(areaCandidate.first)) << "]"
-                                 << " action: " << to_string(action)
-                                 << " cluster candidate: " << areaCandidate.second
-                                 << " new capacity: " << newCandidateCapacity << " delta: "
-                                 << (newCandidateCapacity - previousCandidateCapacity))
-                                  .str(),
-                                LogUtils::LOGLEVEL::INFO,
-                                PROBLEM_GENERATION_LOGGER_CONTEXT);
+        logger->display_message(
+          (std::stringstream() << " Area: " << areaCandidate.first
+                               << " criteria: " << areas.at(areaCandidate.first).avgCriteria << " ["
+                               << lowerThreshold(areas.at(areaCandidate.first)) << "-"
+                               << higherThreshold(areas.at(areaCandidate.first)) << "]"
+                               << " action: " << to_string(action)
+                               << " cluster candidate: " << areaCandidate.second
+                               << " new capacity: " << newCandidateCapacity << " delta: "
+                               << (newCandidateCapacity - previousCandidateCapacity[areaCandidate]))
+            .str(),
+          LogUtils::LOGLEVEL::INFO,
+          PROBLEM_GENERATION_LOGGER_CONTEXT);
     }
 
     return problemManager;

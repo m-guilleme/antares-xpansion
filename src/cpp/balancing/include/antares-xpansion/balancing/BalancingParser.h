@@ -169,13 +169,11 @@ struct Area
     Candidate<DecommissioningCandidateType>& getDecommissioningCandidate(
       const std::string& candidateName);
     void updateRentabilityWithProblem(const CapacityAction action,
-                                      const std::shared_ptr<Problem> problem,
                                       const PbOutput pbOutput,
                                       const std::vector<double> solution);
     template<typename T>
     void computeRentabilityForCandidates(const std::map<std::string, Candidate<T>>& candidates,
                                          const CapacityAction action,
-                                         const std::shared_ptr<Problem> problem,
                                          const PbOutput pbOutput,
                                          const std::vector<double> solution);
     std::string selectCandidateWithBestRentability(CapacityAction action);

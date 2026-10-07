@@ -129,10 +129,8 @@ public:
     /// @brief returns the solution to a problem either from the local solution map (if
     /// cacheProblems), or from the problem itself
     /// @param pbId
-    /// @param problem
-    /// @return
-    std::vector<double> getProblemSolution(const Antares::Solver::WeeklyProblemId& pbId,
-                                           std::shared_ptr<Problem> problem) const;
+    /// @return std::vector<double> Solution of the problem
+    std::vector<double> getProblemSolution(const Antares::Solver::WeeklyProblemId& pbId) const;
 
     void setProblemsPath(const std::filesystem::path& problemsPath)
     {

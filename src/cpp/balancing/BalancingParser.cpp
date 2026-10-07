@@ -82,12 +82,10 @@ Candidate<DecommissioningCandidateType>& Area::getDecommissioningCandidate(
 }
 
 /// @brief Find the best candidate for a given area
-/// @param simuValues The simulation values to look for the cluster candidate selection
-/// @param areaName The name of the area to find the best candidate for
-/// @param area The area investment parameters
 /// @param action The action to apply for which the best candidate is looked for
+/// @param pbOutput AvgCriteria and rice of the problem
+/// @param solution Solution of the problem
 void Area::updateRentabilityWithProblem(const CapacityAction action,
-                                        const std::shared_ptr<Problem> problem,
                                         const PbOutput pbOutput,
                                         const std::vector<double> solution)
 {
@@ -95,22 +93,17 @@ void Area::updateRentabilityWithProblem(const CapacityAction action,
                                     || action == CapacityAction::DISINVESTMENT;
     if (isInvestmentAction)
     {
-        computeRentabilityForCandidates(investmentCandidates, action, problem, pbOutput, solution);
+        computeRentabilityForCandidates(investmentCandidates, action, pbOutput, solution);
     }
     else
     {
-        computeRentabilityForCandidates(decommissioningCandidates,
-                                        action,
-                                        problem,
-                                        pbOutput,
-                                        solution);
+        computeRentabilityForCandidates(decommissioningCandidates, action, pbOutput, solution);
     }
 }
 
 template<typename T>
 void Area::computeRentabilityForCandidates(const std::map<std::string, Candidate<T>>& candidates,
                                            const CapacityAction action,
-                                           const std::shared_ptr<Problem> problem,
                                            const PbOutput pbOutput,
                                            const std::vector<double> solution)
 {
