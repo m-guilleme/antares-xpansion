@@ -134,7 +134,7 @@ static bool shouldSelectMaxRentability(CapacityAction action)
     return action == CapacityAction::INVESTMENT || action == CapacityAction::RECOMMISSIONING;
 }
 
-std::string Area::selectBestClusterFromRentability(CapacityAction action)
+std::string Area::selectCandidateWithBestRentability(CapacityAction action)
 {
     const auto valueOf = [](const auto& entry) { return entry.second; };
     const auto best = shouldSelectMaxRentability(action)

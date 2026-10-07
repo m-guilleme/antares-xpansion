@@ -178,7 +178,7 @@ struct Area
                                          const std::shared_ptr<Problem> problem,
                                          const PbOutput pbOutput,
                                          const std::vector<double> solution);
-    std::string selectBestClusterFromRentability(CapacityAction action);
+    std::string selectCandidateWithBestRentability(CapacityAction action);
 
     template<typename T>
     double extraCost(const Candidate<T>& candidate)

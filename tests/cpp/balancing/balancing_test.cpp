@@ -205,14 +205,14 @@ protected:
         }
     }
 
-    void testApplyActionToCluster(const std::string& areaName,
-                                  const std::string& candidateName,
-                                  const CapacityAction& action,
-                                  const double capacityIncrement,
-                                  const double uBoundRatioToInstCap,
-                                  const double lBoundRatioToUpBound,
-                                  const double expectedUpperCapacity,
-                                  const double expectedLowerCapacity)
+    void testApplyActionToCandidate(const std::string& areaName,
+                                    const std::string& candidateName,
+                                    const CapacityAction& action,
+                                    const double capacityIncrement,
+                                    const double uBoundRatioToInstCap,
+                                    const double lBoundRatioToUpBound,
+                                    const double expectedUpperCapacity,
+                                    const double expectedLowerCapacity)
     {
         // copy study data
         copyStudyData("with_decom_candidate");
@@ -287,8 +287,10 @@ protected:
         auto& area = pbg.areas.at(areaName);
         std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
 
-        // run applyActionToCluster
-        pbg.applyActionToCluster({areaName, candidateName}, action);
+        // run applyActionToCandidate
+        std::map<AreaCandidate, CapacityAction> areaCandidatesToModify = {
+          {{areaName, candidateName}, action}};
+        pbg.applyActionToCandidate(areaCandidatesToModify);
         // assert results
         // we check that new bound of candidate have been correctly set
         assertCandidateBounds(pbg.problemManager,
@@ -524,89 +526,90 @@ TEST_F(BalancingTest, findAreaCandidatesToModify)
     testFindAreaCandidatesToModify();
 }
 
-TEST_F(BalancingTest, applyInvestmentActionToClusterWithUpperonlyBound)
+TEST_F(BalancingTest, applyInvestmentActionToCandidateWithUpperonlyBound)
 {
-    logger->display_message("Testing of applyActionToCluster with INVESTMENT and UpperOnly bound ");
-    testApplyActionToCluster("area2",
-                             "invest_semibase",
-                             CapacityAction::INVESTMENT,
-                             500,
-                             1.0,
-                             0.0,
-                             3500,
-                             0.0);
     logger->display_message(
-      "Test of applyActionToCluster with INVESTMENT and UpperOnly bound done!");
+      "Testing of applyActionToCandidate with INVESTMENT and UpperOnly bound ");
+    testApplyActionToCandidate("area2",
+                               "invest_semibase",
+                               CapacityAction::INVESTMENT,
+                               500,
+                               1.0,
+                               0.0,
+                               3500,
+                               0.0);
+    logger->display_message(
+      "Test of applyActionToCandidate with INVESTMENT and UpperOnly bound done!");
 }
 
-TEST_F(BalancingTest, applyInvestmentActionToClusterWithBothBound)
+TEST_F(BalancingTest, applyInvestmentActionToCandidateWithBothBound)
 {
-    logger->display_message("Testing of applyActionToCluster with INVESTMENT and Both bound");
-    testApplyActionToCluster("area2",
-                             "invest_semibase",
-                             CapacityAction::INVESTMENT,
-                             500,
-                             1.0,
-                             0.9,
-                             3500,
-                             3150);
-    logger->display_message("Test of applyActionToCluster with INVESTMENT and Both bound done!");
+    logger->display_message("Testing of applyActionToCandidate with INVESTMENT and Both bound");
+    testApplyActionToCandidate("area2",
+                               "invest_semibase",
+                               CapacityAction::INVESTMENT,
+                               500,
+                               1.0,
+                               0.9,
+                               3500,
+                               3150);
+    logger->display_message("Test of applyActionToCandidate with INVESTMENT and Both bound done!");
 }
 
-TEST_F(BalancingTest, applyInvestmentActionToClusterWithFixedBound)
+TEST_F(BalancingTest, applyInvestmentActionToCandidateWithFixedBound)
 {
-    logger->display_message("Testing of applyActionToCluster with INVESTMENT and Fixed bound");
-    testApplyActionToCluster("area2",
-                             "invest_semibase",
-                             CapacityAction::INVESTMENT,
-                             500,
-                             0.8,
-                             1.0,
-                             2800,
-                             2800);
-    logger->display_message("Test of applyActionToCluster with INVESTMENT and Fixed bound done!");
+    logger->display_message("Testing of applyActionToCandidate with INVESTMENT and Fixed bound");
+    testApplyActionToCandidate("area2",
+                               "invest_semibase",
+                               CapacityAction::INVESTMENT,
+                               500,
+                               0.8,
+                               1.0,
+                               2800,
+                               2800);
+    logger->display_message("Test of applyActionToCandidate with INVESTMENT and Fixed bound done!");
 }
 
-TEST_F(BalancingTest, applyDisinvestmentActionToCluster)
+TEST_F(BalancingTest, applyDisinvestmentActionToCandidate)
 {
-    logger->display_message("Testing of applyActionToCluster with DISINVESTMENT");
-    testApplyActionToCluster("area2",
-                             "invest_semibase",
-                             CapacityAction::DISINVESTMENT,
-                             500,
-                             1.0,
-                             0.9,
-                             2500,
-                             2250);
-    logger->display_message("Test of applyActionToCluster with DISINVESTMENT done!");
+    logger->display_message("Testing of applyActionToCandidate with DISINVESTMENT");
+    testApplyActionToCandidate("area2",
+                               "invest_semibase",
+                               CapacityAction::DISINVESTMENT,
+                               500,
+                               1.0,
+                               0.9,
+                               2500,
+                               2250);
+    logger->display_message("Test of applyActionToCandidate with DISINVESTMENT done!");
 }
 
-TEST_F(BalancingTest, applyDecomActionToCluster)
+TEST_F(BalancingTest, applyDecomActionToCandidate)
 {
-    logger->display_message("Testing of applyActionToCluster with DECOM");
-    testApplyActionToCluster("area2",
-                             "unprofitable_peak",
-                             CapacityAction::DECOMMISSIONING,
-                             500,
-                             1.0,
-                             0.9,
-                             500,
-                             450);
-    logger->display_message("Test of applyActionToCluster with DECOM done!");
+    logger->display_message("Testing of applyActionToCandidate with DECOM");
+    testApplyActionToCandidate("area2",
+                               "unprofitable_peak",
+                               CapacityAction::DECOMMISSIONING,
+                               500,
+                               1.0,
+                               0.9,
+                               500,
+                               450);
+    logger->display_message("Test of applyActionToCandidate with DECOM done!");
 }
 
-TEST_F(BalancingTest, applyRecomActionToCluster)
+TEST_F(BalancingTest, applyRecomActionToCandidate)
 {
-    logger->display_message("Testing of applyActionToCluster with RECOM");
-    testApplyActionToCluster("area2",
-                             "unprofitable_peak",
-                             CapacityAction::RECOMMISSIONING,
-                             500,
-                             1.0,
-                             0.9,
-                             1500,
-                             1350);
-    logger->display_message("Test of applyActionToCluster with RECOM done!");
+    logger->display_message("Testing of applyActionToCandidate with RECOM");
+    testApplyActionToCandidate("area2",
+                               "unprofitable_peak",
+                               CapacityAction::RECOMMISSIONING,
+                               500,
+                               1.0,
+                               0.9,
+                               1500,
+                               1350);
+    logger->display_message("Test of applyActionToCandidate with RECOM done!");
 }
 
 TEST_F(BalancingTest, computeNonNullRentabilityForCandidates)

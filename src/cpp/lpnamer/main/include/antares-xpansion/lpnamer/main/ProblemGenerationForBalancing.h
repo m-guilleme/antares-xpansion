@@ -61,7 +61,7 @@ private:
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);
     CriterionState computeCriterionState(const Area& area, double value) const;
     void updateAreasIncrement();
-    void applyActionToCluster(const AreaCandidate& areaCandidate, CapacityAction action);
+    void applyActionToCandidate(std::map<AreaCandidate, CapacityAction> areaCandidatesToModify);
     void updateOldCriterionState();
     std::optional<CapacityAction> determineCapacityAction(const Area& area) const;
     template<typename T>

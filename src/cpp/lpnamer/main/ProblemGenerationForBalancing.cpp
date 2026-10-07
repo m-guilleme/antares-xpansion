@@ -517,7 +517,7 @@ std::map<AreaCandidate, CapacityAction> ProblemGenerationForBalancing::findAreaC
 
     for (const auto& [areaName, action]: areasAction)
     {
-        std::string candidateName = areas.at(areaName).selectBestClusterFromRentability(action);
+        std::string candidateName = areas.at(areaName).selectCandidateWithBestRentability(action);
         areaCandidatesToModify[{areaName, candidateName}] = action;
     }
     updateOldCriterionState();
@@ -634,61 +634,88 @@ void ProblemGenerationForBalancing::computeCandidateInstalledCapacity(
 /// @brief Apply the action for each area candidate to the problems
 /// @param areaCandidate The area candidate to apply the action to
 /// @param action The action to apply
-void ProblemGenerationForBalancing::applyActionToCluster(const AreaCandidate& areaCandidate,
-                                                         CapacityAction action)
+void ProblemGenerationForBalancing::applyActionToCandidate(
+  std::map<AreaCandidate, CapacityAction> areaCandidatesToModify)
 {
-    std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
-
-    auto& area = areas.at(areaCandidate.first);
-    area.lastAction = action;
-    computeCandidateInstalledCapacity(action, area, areaCandidate.second);
-    double installedCapacity;
-    if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
+    for (const auto& [areaCandidate, action]: areaCandidatesToModify)
     {
-        auto candidate = area.getInvestmentCandidate(areaCandidate.second);
-        installedCapacity = candidate.installedCapacity;
-        varIndices = candidate.dispProdVarIndices;
-        candidate.updateOscillationStatus(action);
+        auto& area = areas.at(areaCandidate.first);
+        area.lastAction = action;
+        computeCandidateInstalledCapacity(action, area, areaCandidate.second);
+        if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
+        {
+            auto candidate = area.getInvestmentCandidate(areaCandidate.second);
+            candidate.updateOscillationStatus(action);
+        }
+        else
+        {
+            auto candidate = area.getDecommissioningCandidate(areaCandidate.second);
+            candidate.updateOscillationStatus(action);
+        }
     }
-    else
-    {
-        auto candidate = area.getDecommissioningCandidate(areaCandidate.second);
-        installedCapacity = candidate.installedCapacity;
-        varIndices = candidate.dispProdVarIndices;
-        candidate.updateOscillationStatus(action);
-    }
-    std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
 
     tbb::parallel_for_each(
       problemManager->getProblemIds(),
       [&](const auto& pbId)
       {
-          std::vector<BoundData> oneWeekBoundsDataCandidate;
-          switch (action)
-          {
-          case CapacityAction::INVESTMENT:
-          case CapacityAction::DISINVESTMENT:
-              oneWeekBoundsDataCandidate = area.getInvestmentCandidate(areaCandidate.second)
-                                             .boundsData[pbId];
-              break;
-          case CapacityAction::DECOMMISSIONING:
-          case CapacityAction::RECOMMISSIONING:
-              oneWeekBoundsDataCandidate = area.getDecommissioningCandidate(areaCandidate.second)
-                                             .boundsData[pbId];
-              break;
-          }
+          std::vector<char> vecUpperChar(NUMBER_OF_HOURS_PER_WEEK * areaCandidatesToModify.size(),
+                                         'U');
+          std::vector<char> vecLowerChar(NUMBER_OF_HOURS_PER_WEEK * areaCandidatesToModify.size(),
+                                         'L');
+          std::vector<int> vecIndices(NUMBER_OF_HOURS_PER_WEEK * areaCandidatesToModify.size());
+          std::vector<double> upperBoundsValue(NUMBER_OF_HOURS_PER_WEEK
+                                               * areaCandidatesToModify.size());
+          std::vector<double> lowerBoundsValue(NUMBER_OF_HOURS_PER_WEEK
+                                               * areaCandidatesToModify.size());
           std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
-          std::vector<char> vecUpperChar(NUMBER_OF_HOURS_PER_WEEK, 'U');
-          std::vector<char> vecLowerChar(NUMBER_OF_HOURS_PER_WEEK, 'L');
-          std::vector<double> upperBoundsValue(NUMBER_OF_HOURS_PER_WEEK);
-          std::vector<double> lowerBoundsValue(NUMBER_OF_HOURS_PER_WEEK);
-          for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+          int idx = 0;
+          for (const auto& [areaCandidate, action]: areaCandidatesToModify)
           {
-              double upperValue = oneWeekBoundsDataCandidate[hour].upBoundRatioToInstalledCap
-                                  * installedCapacity;
-              upperBoundsValue[hour] = upperValue;
-              lowerBoundsValue[hour] = oneWeekBoundsDataCandidate[hour].lowBoundRatioToUpBound
-                                       * upperValue;
+              std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
+              std::vector<BoundData> oneWeekBoundsDataCandidate;
+              auto& area = areas.at(areaCandidate.first);
+              area.lastAction = action;
+              double installedCapacity;
+              if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
+              {
+                  auto candidate = area.getInvestmentCandidate(areaCandidate.second);
+                  installedCapacity = candidate.installedCapacity;
+                  varIndices = candidate.dispProdVarIndices;
+                  oneWeekBoundsDataCandidate = area.getInvestmentCandidate(areaCandidate.second)
+                                                 .boundsData[pbId];
+              }
+              else
+              {
+                  auto candidate = area.getDecommissioningCandidate(areaCandidate.second);
+                  installedCapacity = candidate.installedCapacity;
+                  varIndices = candidate.dispProdVarIndices;
+                  oneWeekBoundsDataCandidate = area
+                                                 .getDecommissioningCandidate(areaCandidate.second)
+                                                 .boundsData[pbId];
+              }
+
+              std::copy(varIndices.begin(),
+                        varIndices.end(),
+                        vecIndices.begin() + idx * NUMBER_OF_HOURS_PER_WEEK);
+
+              std::vector<double> subUpperBoundsValue(NUMBER_OF_HOURS_PER_WEEK);
+              std::vector<double> subLowerBoundsValue(NUMBER_OF_HOURS_PER_WEEK);
+              for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+              {
+                  double upperValue = oneWeekBoundsDataCandidate[hour].upBoundRatioToInstalledCap
+                                      * installedCapacity;
+                  subUpperBoundsValue[hour] = upperValue;
+                  subLowerBoundsValue[hour] = oneWeekBoundsDataCandidate[hour]
+                                                .lowBoundRatioToUpBound
+                                              * upperValue;
+              }
+              std::copy(subUpperBoundsValue.begin(),
+                        subUpperBoundsValue.end(),
+                        upperBoundsValue.begin() + idx * NUMBER_OF_HOURS_PER_WEEK);
+              std::copy(subLowerBoundsValue.begin(),
+                        subLowerBoundsValue.end(),
+                        lowerBoundsValue.begin() + idx * NUMBER_OF_HOURS_PER_WEEK);
+              idx += 1;
           }
           problem->chg_bounds(vecIndices, vecUpperChar, upperBoundsValue);
           problem->chg_bounds(vecIndices, vecLowerChar, lowerBoundsValue);
@@ -760,12 +787,14 @@ std::shared_ptr<ProblemManager> ProblemGenerationForBalancing::updateProblems(
     logger->display_message("Apply action",
                             LogUtils::LOGLEVEL::INFO,
                             PROBLEM_GENERATION_LOGGER_CONTEXT);
+
+    applyActionToCandidate(areaCandidatesToModify);
+
     for (const auto& [areaCandidate, action]: areaCandidatesToModify)
     {
         double previousCandidateCapacity = getCandidateCurrentCapacity(areas,
                                                                        action,
                                                                        areaCandidate);
-        applyActionToCluster(areaCandidate, action);
         double newCandidateCapacity = getCandidateCurrentCapacity(areas, action, areaCandidate);
         logger->display_message((std::stringstream()
                                  << " Area: " << areaCandidate.first
@@ -773,13 +802,14 @@ std::shared_ptr<ProblemManager> ProblemGenerationForBalancing::updateProblems(
                                  << " [" << lowerThreshold(areas.at(areaCandidate.first)) << "-"
                                  << higherThreshold(areas.at(areaCandidate.first)) << "]"
                                  << " action: " << to_string(action)
-                                 << " cluster: " << areaCandidate.second
+                                 << " cluster candidate: " << areaCandidate.second
                                  << " new capacity: " << newCandidateCapacity << " delta: "
                                  << (newCandidateCapacity - previousCandidateCapacity))
                                   .str(),
                                 LogUtils::LOGLEVEL::INFO,
                                 PROBLEM_GENERATION_LOGGER_CONTEXT);
     }
+
     return problemManager;
 }
 
