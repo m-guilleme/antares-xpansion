@@ -654,19 +654,20 @@ void ProblemGenerationForBalancing::applyActionToCandidate(
         }
     }
 
+    std::vector<char> vecUpperChar(NUMBER_OF_HOURS_PER_WEEK, 'U');
+    std::vector<char> vecLowerChar(NUMBER_OF_HOURS_PER_WEEK, 'L');
+
     tbb::parallel_for_each(
       problemManager->getProblemIds(),
       [&](const auto& pbId)
       {
-          std::vector<char> vecUpperChar(NUMBER_OF_HOURS_PER_WEEK * areaCandidatesToModify.size(),
-                                         'U');
-          std::vector<char> vecLowerChar(NUMBER_OF_HOURS_PER_WEEK * areaCandidatesToModify.size(),
-                                         'L');
-          std::vector<int> vecIndices(NUMBER_OF_HOURS_PER_WEEK * areaCandidatesToModify.size());
-          std::vector<double> upperBoundsValue(NUMBER_OF_HOURS_PER_WEEK
-                                               * areaCandidatesToModify.size());
-          std::vector<double> lowerBoundsValue(NUMBER_OF_HOURS_PER_WEEK
-                                               * areaCandidatesToModify.size());
+          std::vector<int> vecIndices(NUMBER_OF_HOURS_PER_WEEK * areaCandidatesToModify.size() * 2);
+          std::vector<double> vecBoundsValue(NUMBER_OF_HOURS_PER_WEEK
+                                             * areaCandidatesToModify.size() * 2);
+
+          std::vector<char> vecBoundsChar(NUMBER_OF_HOURS_PER_WEEK * areaCandidatesToModify.size()
+                                          * 2);
+
           std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
           int idx = 0;
           for (const auto& [areaCandidate, action]: areaCandidatesToModify)
@@ -693,11 +694,6 @@ void ProblemGenerationForBalancing::applyActionToCandidate(
                                                  .getDecommissioningCandidate(areaCandidate.second)
                                                  .boundsData[pbId];
               }
-
-              std::copy(varIndices.begin(),
-                        varIndices.end(),
-                        vecIndices.begin() + idx * NUMBER_OF_HOURS_PER_WEEK);
-
               std::vector<double> subUpperBoundsValue(NUMBER_OF_HOURS_PER_WEEK);
               std::vector<double> subLowerBoundsValue(NUMBER_OF_HOURS_PER_WEEK);
               for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
@@ -709,16 +705,30 @@ void ProblemGenerationForBalancing::applyActionToCandidate(
                                                 .lowBoundRatioToUpBound
                                               * upperValue;
               }
+
+              std::copy(varIndices.begin(),
+                        varIndices.end(),
+                        vecIndices.begin() + idx * NUMBER_OF_HOURS_PER_WEEK);
+              std::copy(varIndices.begin(),
+                        varIndices.end(),
+                        vecIndices.begin() + (idx + 1) * NUMBER_OF_HOURS_PER_WEEK);
+
+              std::copy(vecUpperChar.begin(),
+                        vecUpperChar.end(),
+                        vecBoundsChar.begin() + idx * NUMBER_OF_HOURS_PER_WEEK);
+              std::copy(vecLowerChar.begin(),
+                        vecLowerChar.end(),
+                        vecBoundsChar.begin() + (idx + 1) * NUMBER_OF_HOURS_PER_WEEK);
+
               std::copy(subUpperBoundsValue.begin(),
                         subUpperBoundsValue.end(),
-                        upperBoundsValue.begin() + idx * NUMBER_OF_HOURS_PER_WEEK);
+                        vecBoundsValue.begin() + idx * NUMBER_OF_HOURS_PER_WEEK);
               std::copy(subLowerBoundsValue.begin(),
                         subLowerBoundsValue.end(),
-                        lowerBoundsValue.begin() + idx * NUMBER_OF_HOURS_PER_WEEK);
-              idx += 1;
+                        vecBoundsValue.begin() + (idx + 1) * NUMBER_OF_HOURS_PER_WEEK);
+              idx += 2;
           }
-          problem->chg_bounds(vecIndices, vecUpperChar, upperBoundsValue);
-          problem->chg_bounds(vecIndices, vecLowerChar, lowerBoundsValue);
+          problem->chg_bounds(vecIndices, vecBoundsChar, vecBoundsValue);
           problemManager->setProblem(pbId, problem);
       });
 }
