@@ -35,6 +35,16 @@ GreedyBalancingFinder::GreedyBalancingFinder(Logger logger,
     setCriterionComputationInputs(criterionInputData);
 }
 
+std::map<Antares::Solver::WeeklyProblemId, PbOutput> GreedyBalancingFinder::getBalancingResults()
+{
+    std::map<Antares::Solver::WeeklyProblemId, PbOutput> res;
+    for (const auto& [key, value]: balancingResults)
+    {
+        res[key] = value;
+    }
+    return res;
+}
+
 /// @brief Build the patterns to use for the criterion computation
 /// @param criterion The criterion to evaluate
 /// @param areas The area investments to use for the evaluation
@@ -145,7 +155,8 @@ void GreedyBalancingFinder::ProcessSubproblem(const Antares::Solver::WeeklyProbl
 /// @brief Compute the criterion and the price for each subproblem
 /// @return A map associating each subproblem id to the computed criterion and price
 std::map<Antares::Solver::WeeklyProblemId, PbOutput>
-GreedyBalancingFinder::ComputeCriterionAndPrice()
+GreedyBalancingFinder::computeCriterionAndPrice(const Antares::Solver::WeeklyProblemId problemId,
+                                                std::shared_ptr<Problem> problem)
 {
     logger->display_message(
       (std::stringstream() << "Launching criterion and price evaluation").str(),
@@ -154,7 +165,7 @@ GreedyBalancingFinder::ComputeCriterionAndPrice()
 
     Timer run_timer;
 
-    Run();
+    ProcessSubproblem(problemId, problem);
 
     auto run_time = run_timer.elapsed();
     logger->display_message(

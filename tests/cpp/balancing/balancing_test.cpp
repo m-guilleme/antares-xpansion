@@ -290,7 +290,12 @@ protected:
         // run applyActionToCandidate
         std::map<AreaCandidate, CapacityAction> areaCandidatesToModify = {
           {{areaName, candidateName}, action}};
-        pbg.applyActionToCandidate(areaCandidatesToModify);
+        pbg.initializeCandidatesToModify(areaCandidatesToModify);
+        for (const auto& pbId: problemManager->getProblemIds())
+        {
+            auto problem = pbg.problemManager->getProblemFromId(pbId);
+            pbg.applyActionToCandidate(pbId, problem, areaCandidatesToModify);
+        }
         // assert results
         // we check that new bound of candidate have been correctly set
         assertCandidateBounds(pbg.problemManager,

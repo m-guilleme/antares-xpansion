@@ -1,3 +1,6 @@
+
+#include <tbb/parallel_for_each.h>
+
 #include "RandomDirGenerator.h"
 #include "antares-xpansion/balancing/BalancingParser.h"
 #include "antares-xpansion/balancing/SettingsConfigReader.h"
@@ -151,42 +154,76 @@ protected:
         // generating problems
         logger->display_message("Generating problems...");
         auto problemManager = std::make_shared<ProblemManager>(solverName);
-        ProblemGenerationForBalancing pbg(directories,
-                                          balParser.areas,
-                                          logger,
-                                          problemManager,
-                                          iterationsLogFilePath);
+        std::shared_ptr<ProblemGenerationForBalancing>
+          pbg = std::make_shared<ProblemGenerationForBalancing>(directories,
+                                                                balParser.areas,
+                                                                logger,
+                                                                problemManager,
+                                                                iterationsLogFilePath);
         logger->display_message("Problems generated.");
 
         // balancing
-        std::map<Antares::Solver::WeeklyProblemId, PbOutput> res;
+        std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues;
         // First iteration will be iteration 0 (the iteration before any modification is applied
         // to the problems)
         int iteration = -1;
         logger->display_message("Starting balancing process");
-        pbg.logAreasView(res);
-        while (!pbg.isBalanced() && !pbg.isBlocked() && iteration < max_iterations)
+        pbg->logAreasView(simuValues);
+        bool blocked = false;
+        while (!pbg->isBalanced() && !blocked && iteration < max_iterations)
         {
             iteration++;
-            logger->display_message("Iteration " + std::to_string(iteration));
-            auto updatedProblemsManager = pbg.updateProblems(res);
-
-            res = GreedyBalancingFinder(logger,
-                                        balParser.areas,
-                                        balParser.getReliabilityStandardIndicator(),
-                                        updatedProblemsManager,
-                                        solverName,
-                                        directories.simulation_dir,
-                                        8)
-                    .ComputeCriterionAndPrice();
-            pbg.logAreasView(res);
-            logger->display_message("Iteration " + std::to_string(iteration) + " done.");
-            pbg.saveIterativeAreasViewToCSV(iteration);
-            pbg.updateAreaCriteriaData(res);
+            logger->display_message("Iteration " + std::to_string(iteration),
+                                    LogUtils::LOGLEVEL::INFO,
+                                    logger->CONTEXT);
+            std::map<AreaCandidate, CapacityAction> areaCandidatesToModify;
+            // For the first iteration, simuValues is empty and no modification should be applied
+            if (!simuValues.empty())
+            {
+                areaCandidatesToModify = pbg->findAreaCandidatesToModify(simuValues);
+            }
+            if (areaCandidatesToModify.empty() && iteration > 0)
+            {
+                logger->display_message(
+                  (std::stringstream() << "No actions found in any area, stop the run").str(),
+                  LogUtils::LOGLEVEL::INFO,
+                  PROBLEM_GENERATION_LOGGER_CONTEXT);
+                blocked = true;
+            }
+            else
+            {
+                if (!areaCandidatesToModify.empty())
+                {
+                    pbg->initializeCandidatesToModify(areaCandidatesToModify);
+                }
+                std::shared_ptr<GreedyBalancingFinder> gbf = std::make_shared<
+                  GreedyBalancingFinder>(logger,
+                                         balParser.areas,
+                                         balParser.getReliabilityStandardIndicator(),
+                                         pbg->problemManager,
+                                         solverName,
+                                         directories.simulation_dir,
+                                         8);
+                tbb::parallel_for_each(
+                  problemManager->getProblemIds(),
+                  [&](const auto& pbId)
+                  {
+                      std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
+                      if (!areaCandidatesToModify.empty())
+                      {
+                          pbg->applyActionToCandidate(pbId, problem, areaCandidatesToModify);
+                      }
+                      gbf->computeCriterionAndPrice(pbId, problem);
+                  });
+                simuValues = gbf->getBalancingResults();
+                pbg->saveIterativeAreasViewToCSV(iteration);
+                pbg->updateAreaCriteriaData(simuValues);
+                pbg->logAreasView(simuValues);
+            }
         };
         // saving final results
-        pbg.saveCandidatesResultsToCSV(directories.simulation_dir / "final_capacities.csv");
-        pbg.saveAreasViewToCSV(finalCriteriaFilePath);
+        pbg->saveCandidatesResultsToCSV(directories.simulation_dir / "final_capacities.csv");
+        pbg->saveAreasViewToCSV(finalCriteriaFilePath);
 
         // compare results to ref
         logger->display_message("\nComparing results files...");

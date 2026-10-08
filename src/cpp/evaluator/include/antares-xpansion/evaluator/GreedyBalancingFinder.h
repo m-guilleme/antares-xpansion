@@ -22,9 +22,12 @@ public:
                           std::filesystem::path studyDir,
                           int nbThreads = 1);
 
-    std::map<Antares::Solver::WeeklyProblemId, PbOutput> ComputeCriterionAndPrice();
+    std::map<Antares::Solver::WeeklyProblemId, PbOutput> computeCriterionAndPrice(
+      const Antares::Solver::WeeklyProblemId problemId,
+      std::shared_ptr<Problem> problem);
     void setCriterionComputationInputs(
       const Benders::Criterion::CriterionInputData& criterion_input_data);
+    std::map<Antares::Solver::WeeklyProblemId, PbOutput> getBalancingResults();
 
 private:
     std::unique_ptr<Benders::Criterion::CriterionComputation> criterion_computation_;

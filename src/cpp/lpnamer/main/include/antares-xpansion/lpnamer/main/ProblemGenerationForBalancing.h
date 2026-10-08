@@ -21,8 +21,6 @@ public:
                                            std::shared_ptr<ProblemManager> problemManager,
                                            std::filesystem::path iterationsLogFileName);
     virtual ~ProblemGenerationForBalancing() = default;
-    std::shared_ptr<ProblemManager> updateProblems(
-      const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);
     bool isBalanced() const;
     bool isBlocked() const;
     void logAreasView(const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues) const;
@@ -31,18 +29,21 @@ public:
     void saveIterativeAreasViewToCSV(int iteration) const;
     void updateAreaCriteriaData(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);
+    std::map<AreaCandidate, CapacityAction> findAreaCandidatesToModify(
+      const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);
 
     Candidate<InvestmentCandidateType>& getInvestmentCandidate(const std::string& areaName,
                                                                const std::string& candidateName);
     Candidate<DecommissioningCandidateType>& getDecommissioningCandidate(
       const std::string& areaName,
       const std::string& candidateName);
-
-private:
-    bool blocked = false;
-    std::map<std::string, Area>& areas;
-    std::map<std::string, CapacityAction> areasAction;
-    std::filesystem::path iterationsLogFileName;
+    double getCandidateCurrentCapacity(const CapacityAction& action,
+                                       const AreaCandidate& areaCandidate);
+    void initializeCandidatesToModify(
+      std::map<AreaCandidate, CapacityAction>& areaCandidatesToModify);
+    void applyActionToCandidate(Antares::Solver::WeeklyProblemId pbId,
+                                std::shared_ptr<Problem>& problem,
+                                std::map<AreaCandidate, CapacityAction> areaCandidatesToModify);
 
     double lowerThreshold(const Area& area) const
     {
@@ -54,14 +55,17 @@ private:
         return area.reliabilityStandard + area.reliabilityStandardDeadBandUp;
     }
 
+    std::map<std::string, Area>& areas;
+
+private:
+    std::map<std::string, CapacityAction> areasAction;
+    std::filesystem::path iterationsLogFileName;
+
     void initializeIterativeLogCSV() const;
     void fillDispProdVarIndicesAndMarginalCosts();
     void setCapacitiesDataForCandidates();
-    std::map<AreaCandidate, CapacityAction> findAreaCandidatesToModify(
-      const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);
     CriterionState computeCriterionState(const Area& area, double value) const;
     void updateAreasIncrement();
-    void applyActionToCandidate(std::map<AreaCandidate, CapacityAction> areaCandidatesToModify);
     void updateOldCriterionState();
     std::optional<CapacityAction> determineCapacityAction(const Area& area) const;
     template<typename T>

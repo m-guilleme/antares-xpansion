@@ -2,6 +2,7 @@
 #include <chrono>
 #include <iostream>
 #include <tbb/global_control.h>
+#include <tbb/parallel_for_each.h>
 
 #include "antares-xpansion/balancing/BalancingParser.h"
 #include "antares-xpansion/balancing/SettingsConfigReader.h"
@@ -107,11 +108,12 @@ int main(int argc, char** argv)
                                                                cacheProblems,
                                                                directories.simulation_dir
                                                                  / "initial_problems");
-        ProblemGenerationForBalancing pbg(directories,
-                                          balParser.areas,
-                                          logger,
-                                          problemManager,
-                                          iterationsLogFilePath);
+        std::shared_ptr<ProblemGenerationForBalancing>
+          pbg = std::make_shared<ProblemGenerationForBalancing>(directories,
+                                                                balParser.areas,
+                                                                logger,
+                                                                problemManager,
+                                                                iterationsLogFilePath);
         auto endProblemGeneration = std::chrono::system_clock::now();
         logger->display_message("Problems generated", LogUtils::LOGLEVEL::INFO, logger->CONTEXT);
         std::chrono::duration<double> elapsed_seconds = endProblemGeneration
@@ -121,7 +123,7 @@ int main(int argc, char** argv)
                                 LogUtils::LOGLEVEL::INFO,
                                 logger->CONTEXT);
 
-        std::map<Antares::Solver::WeeklyProblemId, PbOutput> res;
+        std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues;
         // First iteration will be iteration 0 (the iteration before any modification is applied to
         // the problems)
         int iteration = -1;
@@ -129,40 +131,103 @@ int main(int argc, char** argv)
         logger->display_message("Starting balancing process",
                                 LogUtils::LOGLEVEL::INFO,
                                 logger->CONTEXT);
-        pbg.logAreasView(res);
-        while (!pbg.isBalanced() && !pbg.isBlocked() && iteration < max_iterations)
+        pbg->logAreasView(simuValues);
+        bool blocked = false;
+        while (!pbg->isBalanced() && !blocked && iteration < max_iterations)
         {
             iteration++;
             auto startIteration = std::chrono::system_clock::now();
             logger->display_message("Iteration " + std::to_string(iteration),
                                     LogUtils::LOGLEVEL::INFO,
                                     logger->CONTEXT);
-            auto updatedProblemsManager = pbg.updateProblems(res);
+            std::map<AreaCandidate, CapacityAction> areaCandidatesToModify;
+            // For the first iteration, simuValues is empty and no modification should be applied
+            if (!simuValues.empty())
+            {
+                areaCandidatesToModify = pbg->findAreaCandidatesToModify(simuValues);
+            }
+            if (areaCandidatesToModify.empty() && iteration > 0)
+            {
+                logger->display_message(
+                  (std::stringstream() << "No actions found in any area, stop the run").str(),
+                  LogUtils::LOGLEVEL::INFO,
+                  PROBLEM_GENERATION_LOGGER_CONTEXT);
+                blocked = true;
+            }
+            else
+            {
+                std::map<AreaCandidate, double> previousCandidateCapacity;
+                if (!areaCandidatesToModify.empty())
+                {
+                    logger->display_message("Apply action",
+                                            LogUtils::LOGLEVEL::INFO,
+                                            PROBLEM_GENERATION_LOGGER_CONTEXT);
+                    for (const auto& [areaCandidate, action]: areaCandidatesToModify)
+                    {
+                        previousCandidateCapacity[areaCandidate] = pbg->getCandidateCurrentCapacity(
+                          action,
+                          areaCandidate);
+                    }
+                    pbg->initializeCandidatesToModify(areaCandidatesToModify);
+                    for (const auto& [areaCandidate, action]: areaCandidatesToModify)
+                    {
+                        double newCandidateCapacity = pbg->getCandidateCurrentCapacity(
+                          action,
+                          areaCandidate);
+                        logger->display_message(
+                          (std::stringstream()
+                           << " Area: " << areaCandidate.first
+                           << " criteria: " << pbg->areas.at(areaCandidate.first).avgCriteria
+                           << " [" << pbg->lowerThreshold(pbg->areas.at(areaCandidate.first)) << "-"
+                           << pbg->higherThreshold(pbg->areas.at(areaCandidate.first)) << "]"
+                           << " action: " << to_string(action)
+                           << " cluster candidate: " << areaCandidate.second
+                           << " new capacity: " << newCandidateCapacity << " delta: "
+                           << (newCandidateCapacity - previousCandidateCapacity[areaCandidate]))
+                            .str(),
+                          LogUtils::LOGLEVEL::INFO,
+                          PROBLEM_GENERATION_LOGGER_CONTEXT);
+                    }
+                }
+                std::shared_ptr<GreedyBalancingFinder> gbf = std::make_shared<
+                  GreedyBalancingFinder>(logger,
+                                         balParser.areas,
+                                         balParser.getReliabilityStandardIndicator(),
+                                         pbg->problemManager,
+                                         solverName,
+                                         directories.simulation_dir,
+                                         nbThreads);
+                tbb::parallel_for_each(
+                  problemManager->getProblemIds(),
+                  [&](const auto& pbId)
+                  {
+                      std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
+                      if (!areaCandidatesToModify.empty())
+                      {
+                          pbg->applyActionToCandidate(pbId, problem, areaCandidatesToModify);
+                      }
+                      gbf->computeCriterionAndPrice(pbId, problem);
+                  });
+                simuValues = gbf->getBalancingResults();
 
-            res = GreedyBalancingFinder(logger,
-                                        balParser.areas,
-                                        balParser.getReliabilityStandardIndicator(),
-                                        updatedProblemsManager,
-                                        solverName,
-                                        directories.simulation_dir,
-                                        nbThreads)
-                    .ComputeCriterionAndPrice();
-            auto endIteration = std::chrono::system_clock::now();
-            pbg.logAreasView(res);
-            std::chrono::duration<double> elapsed_iteration_seconds = endIteration - startIteration;
-            logger->display_message("Elapsed time for iteration " + std::to_string(iteration) + ": "
-                                      + formatDuration(elapsed_iteration_seconds),
-                                    LogUtils::LOGLEVEL::INFO,
-                                    logger->CONTEXT);
-            pbg.saveIterativeAreasViewToCSV(iteration);
-            pbg.updateAreaCriteriaData(res);
+                auto endIteration = std::chrono::system_clock::now();
+                pbg->saveIterativeAreasViewToCSV(iteration);
+                pbg->updateAreaCriteriaData(simuValues);
+                pbg->logAreasView(simuValues);
+                std::chrono::duration<double> elapsed_iteration_seconds = endIteration
+                                                                          - startIteration;
+                logger->display_message("Elapsed time for iteration " + std::to_string(iteration)
+                                          + ": " + formatDuration(elapsed_iteration_seconds),
+                                        LogUtils::LOGLEVEL::INFO,
+                                        logger->CONTEXT);
+            }
         };
         logger->display_message("Final iteration " + std::to_string(++iteration),
                                 LogUtils::LOGLEVEL::INFO,
                                 logger->CONTEXT);
-        pbg.logAreasView(res);
-        pbg.saveCandidatesResultsToCSV(directories.simulation_dir / "final_capacities.csv");
-        pbg.saveAreasViewToCSV(finalCriteriaFilePath);
+        pbg->logAreasView(simuValues);
+        pbg->saveCandidatesResultsToCSV(directories.simulation_dir / "final_capacities.csv");
+        pbg->saveAreasViewToCSV(finalCriteriaFilePath);
         auto endProblemUpdate = std::chrono::system_clock::now();
         std::chrono::duration<double> elapsed_update_seconds = endProblemUpdate
                                                                - startBalancingProcess;
@@ -170,8 +235,8 @@ int main(int argc, char** argv)
                                   + " iterations. In " + formatDuration(elapsed_update_seconds),
                                 LogUtils::LOGLEVEL::INFO,
                                 logger->CONTEXT);
-        logger->display_message(pbg.isBalanced() ? "The system is balanced."
-                                                 : "The system is not balanced.",
+        logger->display_message(pbg->isBalanced() ? "The system is balanced."
+                                                  : "The system is not balanced.",
                                 LogUtils::LOGLEVEL::INFO,
                                 logger->CONTEXT);
 
