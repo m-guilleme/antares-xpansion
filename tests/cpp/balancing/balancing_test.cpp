@@ -65,8 +65,7 @@ protected:
         };
         const std::filesystem::path iterLogFilePath = directories.simulation_dir
                                                       / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(tmpDir
-                                                     / "user/balancing/input_balancing_LOLE.yml");
+        const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
         // instantiation of ProblemGenerationForBalancing with dummy data
         BalancingParser dummyBalParser(inputBalFilePath);
         auto problemManager = std::make_shared<ProblemManager>("xpress",
@@ -223,8 +222,7 @@ protected:
         };
         const std::filesystem::path iterLogFilePath = directories.simulation_dir
                                                       / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(tmpDir
-                                                     / "user/balancing/input_balancing_LOLE.yml");
+        const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
         // instantiation of ProblemGenerationForBalancing
         BalancingParser balParser(inputBalFilePath);
         auto problemManager = std::make_shared<ProblemManager>();
@@ -328,8 +326,7 @@ protected:
         };
         const std::filesystem::path iterLogFilePath = directories.simulation_dir
                                                       / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(tmpDir
-                                                     / "user/balancing/input_balancing_LOLE.yml");
+        const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
         // instantiation of ProblemGenerationForBalancing
         BalancingParser balParser(inputBalFilePath);
         auto problemManager = std::make_shared<ProblemManager>("xpress",
@@ -434,8 +431,7 @@ protected:
         };
         const std::filesystem::path iterLogFilePath = directories.simulation_dir
                                                       / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(tmpDir
-                                                     / "user/balancing/input_balancing_LOLE.yml");
+        const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
         // instantiation of ProblemGenerationForBalancing
         BalancingParser balParser(inputBalFilePath);
         auto problemManager = std::make_shared<ProblemManager>();
