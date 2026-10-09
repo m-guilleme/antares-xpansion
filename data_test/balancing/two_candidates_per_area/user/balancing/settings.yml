@@ -1,0 +1,18 @@
+# All parameters related to general settings when computing water values.
+# Use ~ to fall back on default values (as implemented in C++ code)
+# default values are subject to change
+
+solver : xpress
+# default: xpress
+# possible values are: xpress, coin
+
+cache_problems : false
+
+
+verbosity : INFO
+# Sets the desired level of verbosity of log messages displayed in the console. 
+# Setting the verbosity to a given level will allow messages to appear if their level is higher in the list or equal to the level specified.
+# For example setting the verbosity to `WARNING` will filter out all messages at the `TRACE`, `DEBUG` or `INFO` level,
+# and will pass along all messages at the `WARNING`, `ERR` or `FATAL` level.
+# default: INFO
+# possible values are: NONE, TRACE, DEBUG, INFO, WARNING, ERR, FATAL

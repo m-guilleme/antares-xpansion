@@ -65,8 +65,10 @@ Benders::Criterion::CriterionInputData BendersFactory::BuildPatternsUsingAreaFil
 
     for (const auto& area: unique_areas)
     {
-        Benders::Criterion::CriterionSingleInputData
-          singleInputData(Benders::Criterion::UnsuppliedEnergy, area, 1);
+        Benders::Criterion::CriterionSingleInputData singleInputData(
+          Benders::Criterion::getPrefix(Benders::Criterion::Type::UnsuppliedEnergy),
+          area,
+          1);
         ret.AddSingleData(singleInputData);
     }
 

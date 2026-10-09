@@ -57,6 +57,20 @@ inline std::string trim(std::string_view original)
     return std::string(left, right);
 }
 
+inline std::string& removeTrailingSpacesInPlace(std::string& original)
+{
+    original.erase(
+      std::ranges::find_if(original | std::ranges::views::reverse, IsNotSpace()).base(),
+      original.end());
+    return original;
+}
+
+inline std::string removeTrailingSpaces(std::string_view original)
+{
+    auto right = std::find_if(original.rbegin(), original.rend(), IsNotSpace()).base();
+    return std::string(original.begin(), right);
+}
+
 inline std::vector<std::string> split(std::string_view original, char delimiter = ' ')
 {
     // TODO C++20 https://en.cppreference.com/w/cpp/ranges/split_view

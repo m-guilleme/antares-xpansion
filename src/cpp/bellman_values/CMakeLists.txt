@@ -12,15 +12,11 @@ add_library(bellman_values_lib STATIC)
 
 target_sources(bellman_values_lib PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/BellmanValues.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/BellmanValuesExeOptions.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/ConfigReader.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/DynamicProgrammingConfigReader.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/SettingsConfigReader.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ProblemManager.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/bellman_values/BellmanValues.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/bellman_values/ProblemManager.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/bellman_values/BellmanValuesExeOptions.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/bellman_values/ConfigReader.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/bellman_values/DynamicProgrammingConfigReader.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/bellman_values/SettingsConfigReader.h
 )
@@ -29,7 +25,7 @@ target_link_libraries(bellman_values_lib
         PUBLIC
         antaresXpansion::evaluator_lib
         antaresXpansion::helpers
-        yaml-cpp::yaml-cpp
+        antaresXpansion::config_reader_lib
 )
 
 target_include_directories(bellman_values_lib
