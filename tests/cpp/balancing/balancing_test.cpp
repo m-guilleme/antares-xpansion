@@ -1,3 +1,13 @@
+#include <array>
+#include <filesystem>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "RandomDirGenerator.h"
 #include "antares-xpansion/balancing/BalancingParser.h"
 #include "antares-xpansion/balancing/SettingsConfigReader.h"
@@ -9,198 +19,253 @@
 #include "antares-xpansion/lpnamer/main/ProblemGenerationForBalancing.h"
 #include "gtest/gtest.h"
 
+namespace
+{
+using HourlyIndices = std::array<size_t, NUMBER_OF_HOURS_PER_WEEK>;
+
+// Size of the dummy solution vector: big enough to cover candidate indices in each study
+constexpr size_t SOLUTION_SIZE = 3100;
+
+bool isInvestmentAction(const CapacityAction& action)
+{
+    return action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT;
+}
+
+// Calls func on the investment candidate (INVESTMENT / DISINVESTMENT) or on the
+// decommissioning candidate (DECOMMISSIONING / RECOMMISSIONING) matching the action.
+// func must be a generic lambda returning the same type for both candidate types.
+template<typename Func>
+auto visitCandidate(ProblemGenerationForBalancing& pbg,
+                    const std::string& areaName,
+                    const std::string& candidateName,
+                    const CapacityAction& action,
+                    Func&& func)
+{
+    if (isInvestmentAction(action))
+    {
+        return func(pbg.getInvestmentCandidate(areaName, candidateName));
+    }
+    return func(pbg.getDecommissioningCandidate(areaName, candidateName));
+}
+
+HourlyIndices getDispProdVarIndices(ProblemGenerationForBalancing& pbg,
+                                    const std::string& areaName,
+                                    const std::string& candidateName,
+                                    const CapacityAction& action)
+{
+    return visitCandidate(pbg,
+                          areaName,
+                          candidateName,
+                          action,
+                          [](auto& candidate) -> HourlyIndices
+                          { return candidate.dispProdVarIndices; });
+}
+
+void initializeAreaRentability(Area& area, const CapacityAction& action)
+{
+    if (isInvestmentAction(action))
+    {
+        area.initializeRentability(area.investmentCandidates, action);
+    }
+    else
+    {
+        area.initializeRentability(area.decommissioningCandidates, action);
+    }
+}
+
+std::shared_ptr<ProblemManager> makeXpressProblemManager()
+{
+    return std::make_shared<ProblemManager>("xpress", "mps", false, true, "initial_problems");
+}
+
+void assertCandidateBounds(const std::shared_ptr<ProblemManager>& problemManager,
+                           const std::vector<int>& candidateIndices,
+                           double expectedUpperBound,
+                           double expectedLowerBound)
+{
+    for (const auto& pbId: problemManager->getProblemIds())
+    {
+        auto problem = problemManager->getProblemFromId(pbId);
+        for (const int index: candidateIndices)
+        {
+            double upperBound;
+            double lowerBound;
+            problem->get_ub(&upperBound, index, index);
+            problem->get_lb(&lowerBound, index, index);
+            EXPECT_DOUBLE_EQ(upperBound, expectedUpperBound);
+            EXPECT_DOUBLE_EQ(lowerBound, expectedLowerBound);
+        }
+    }
+}
+} // namespace
+
 class BalancingTest: public ::testing::Test
 {
-public:
+protected:
     Logger logger;
     std::filesystem::path tmpDir;
-    const std::filesystem::path data_test_dir = "data_test/balancing";
-    const std::string solverName = "xpress";
-
-protected:
-    std::filesystem::path original_dir;
+    std::filesystem::path originalDir;
+    const std::filesystem::path dataTestDir = "data_test/balancing";
+    std::vector<std::filesystem::path> createdTmpDirs;
 
     void SetUp() override
     {
-        Logger std_out_logger;
-        std_out_logger = std::make_shared<xpansion::logger::User>(std::cerr);
-        auto master_logger = std::make_shared<xpansion::logger::Master>();
-        master_logger->addLogger(std_out_logger);
-        logger = std::make_shared<FilteredLogger>(master_logger, LogUtils::LOGLEVEL::INFO);
-        original_dir = std::filesystem::current_path();
+        Logger stdOutLogger = std::make_shared<xpansion::logger::User>(std::cerr);
+        auto masterLogger = std::make_shared<xpansion::logger::Master>();
+        masterLogger->addLogger(stdOutLogger);
+        logger = std::make_shared<FilteredLogger>(masterLogger, LogUtils::LOGLEVEL::INFO);
+        originalDir = std::filesystem::current_path();
     }
 
     void TearDown() override
     {
-        std::filesystem::current_path(original_dir);
+        std::filesystem::current_path(originalDir);
+        std::error_code ec;
+        for (const auto& dir: createdTmpDirs)
+        {
+            std::filesystem::remove_all(dir, ec);
+        }
     }
 
     void copyStudyData(const std::string& studyName)
     {
-        std::filesystem::path data_dir = data_test_dir / studyName;
         tmpDir = CreateRandomSubDir(std::filesystem::temp_directory_path());
+        createdTmpDirs.push_back(tmpDir);
 
-        std::filesystem::copy(data_dir,
+        std::filesystem::copy(dataTestDir / studyName,
                               tmpDir,
                               std::filesystem::copy_options::recursive
                                 | std::filesystem::copy_options::overwrite_existing);
     }
 
-    void testFindAreaCandidatesToModify()
+    // Copies the study into a temporary directory and builds a ProblemGenerationForBalancing
+    // from it. The balancing config is read from the copied study unless inputBalFilePath is set.
+    ProblemGenerationForBalancing makeProblemGeneration(
+      const std::string& studyName,
+      const std::shared_ptr<ProblemManager>& problemManager = std::make_shared<ProblemManager>(),
+      const std::optional<std::filesystem::path>& inputBalFilePath = std::nullopt)
     {
-        logger->display_message("Testing of findAreaCandidatesToModify");
+        copyStudyData(studyName);
 
-        std::vector<std::string> areasName = {"invest_area",
-                                              "desinvest_area",
-                                              "decom_area",
-                                              "recom_area"};
-        std::vector<std::string> candidatesName = {"candidate_1", "candidate_2"};
-
-        // copy dummy data
-        copyStudyData("one_candidate_per_area");
-        // directories and path
         ConfigurationManager::ConfigDirectories directories{
           .study_dir = tmpDir,
           .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
         };
         const std::filesystem::path iterLogFilePath = directories.simulation_dir
                                                       / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
-        // instantiation of ProblemGenerationForBalancing with dummy data
-        BalancingParser dummyBalParser(inputBalFilePath);
-        auto problemManager = std::make_shared<ProblemManager>("xpress",
-                                                               "mps",
-                                                               false,
-                                                               true,
-                                                               "initial_problems");
-        ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(directories,
-                                                                          dummyBalParser.areas,
-                                                                          logger,
-                                                                          problemManager,
-                                                                          iterLogFilePath);
+        BalancingParser balParser(
+          inputBalFilePath.value_or(tmpDir / "user" / "balancing" / "input_balancing.yml"));
+        std::map<std::string, Area> areas = balParser.parse();
+        return ProblemGenerationForBalancing(directories,
+                                             areas,
+                                             logger,
+                                             problemManager,
+                                             iterLogFilePath);
+    }
+
+    void testFindAreaCandidatesToModify()
+    {
+        const std::vector<std::string> areasName = {"invest_area",
+                                                    "desinvest_area",
+                                                    "decom_area",
+                                                    "recom_area"};
+        const std::vector<std::string> candidatesName = {"candidate_1", "candidate_2"};
+
+        // dummy data, areas are replaced by the real test data below
+        auto pbg = makeProblemGeneration("one_candidate_per_area", makeXpressProblemManager());
 
         // set real test data
-        // set pbg.areas
-        const std::filesystem::path balancingConfigFilePath(
-          "data_test/balancing/find_area_cluster_to_modify/input_balancing.yml");
-        BalancingParser balParser(balancingConfigFilePath);
-        pbg.areas = balParser.areas;
-        pbg.getInvestmentCandidate("desinvest_area", "candidate_1").installedCapacity = 1000;
-        pbg.getInvestmentCandidate("desinvest_area", "candidate_2").installedCapacity = 1000;
-        pbg.getDecommissioningCandidate("decom_area", "candidate_1").installedCapacity = 1000;
-        pbg.getDecommissioningCandidate("decom_area", "candidate_2").installedCapacity = 1000;
-        pbg.getDecommissioningCandidate("recom_area", "candidate_1").initInstalledCapacity = 1000;
-        pbg.getDecommissioningCandidate("recom_area", "candidate_2").initInstalledCapacity = 1000;
+        BalancingParser balParser(dataTestDir / "find_area_cluster_to_modify"
+                                  / "input_balancing.yml");
+        pbg.areas = balParser.parse();
+
+        constexpr double capacity = 1000;
+        for (const auto& candidateName: candidatesName)
+        {
+            pbg.getInvestmentCandidate("desinvest_area", candidateName).installedCapacity
+              = capacity;
+            pbg.getDecommissioningCandidate("decom_area", candidateName).installedCapacity
+              = capacity;
+            pbg.getDecommissioningCandidate("recom_area", candidateName).initInstalledCapacity
+              = capacity;
+        }
+
         // set area lastAction
         pbg.areas.at("invest_area").lastAction = CapacityAction::INVESTMENT;
         pbg.areas.at("desinvest_area").lastAction = CapacityAction::INVESTMENT;
         pbg.areas.at("decom_area").lastAction = CapacityAction::DECOMMISSIONING;
         pbg.areas.at("recom_area").lastAction = CapacityAction::DECOMMISSIONING;
 
-        // set pbg.area, probleManager.solutions_ and simuValues
-        std::vector<double> solution(168 * 8);
+        // set problemManager solution and simulation values:
+        // candidate_1 produces 1.0 every hour, candidate_2 produces 0.0
+        std::vector<double> solution(NUMBER_OF_HOURS_PER_WEEK * areasName.size()
+                                     * candidatesName.size());
         PbOutput pbOutput;
-        std::map<std::string, int> areaCriterionValues = {{"invest_area", 5},
-                                                          {"desinvest_area", 2},
-                                                          {"decom_area", 2},
-                                                          {"recom_area", 5}};
-        pbOutput.areaCriterionValues = areaCriterionValues;
+        pbOutput.areaCriterionValues = {{"invest_area", 5},
+                                        {"desinvest_area", 2},
+                                        {"decom_area", 2},
+                                        {"recom_area", 5}};
         std::array<double, NUMBER_OF_HOURS_PER_WEEK> areaPrices;
-        for (int hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
-        {
-            areaPrices.at(hour) = 1;
-        }
+        areaPrices.fill(1.0);
 
-        int idx(0);
-        for (std::string areaName: areasName)
+        size_t idx = 0;
+        for (const auto& areaName: areasName)
         {
             pbOutput.areaPrices[areaName] = areaPrices;
-            for (std::string candidateName: candidatesName)
+            const bool isInvestmentArea = areaName == "invest_area" || areaName == "desinvest_area";
+            for (const auto& candidateName: candidatesName)
             {
-                std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> areaCandidateIndices;
-                for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+                HourlyIndices candidateIndices;
+                for (auto& index: candidateIndices)
                 {
                     solution.at(idx) = (candidateName == "candidate_1") ? 1.0 : 0.0;
-                    areaCandidateIndices.at(hour) = idx;
-                    idx += 1;
+                    index = idx++;
                 }
-                if (areaName == "invest_area" || areaName == "desinvest_area")
+                if (isInvestmentArea)
                 {
                     pbg.getInvestmentCandidate(areaName, candidateName).dispProdVarIndices
-                      = areaCandidateIndices;
+                      = candidateIndices;
                 }
                 else
                 {
                     pbg.getDecommissioningCandidate(areaName, candidateName).dispProdVarIndices
-                      = areaCandidateIndices;
+                      = candidateIndices;
                 }
             }
         }
         Antares::Solver::WeeklyProblemId pbId({1, 1});
         pbg.problemManager->setProblemSolution(pbId, solution);
         std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues = {{pbId, pbOutput}};
-        // compute areaCriteriaData
-        pbg.updateAreaCriteriaData(simuValues);
-        // run findAreaCandidatesToModify
-        std::map<AreaCandidate, CapacityAction>
-          areaCandidateToModify = pbg.findAreaCandidatesToModify(simuValues);
-        // assert results
-        // we check that the correct candidate and action have been selected
-        for (const auto& [areaCandidate, action]: areaCandidateToModify)
-        {
-            if (areaCandidate.first == "invest_area")
-            {
-                EXPECT_TRUE(areaCandidate.second == "candidate_1");
-                EXPECT_TRUE(action == CapacityAction::INVESTMENT);
-            }
-            if (areaCandidate.first == "desinvest_area")
-            {
-                EXPECT_TRUE(areaCandidate.second == "candidate_2");
-                EXPECT_TRUE(action == CapacityAction::DISINVESTMENT);
-            }
-            if (areaCandidate.first == "decom_area")
-            {
-                EXPECT_TRUE(areaCandidate.second == "candidate_2");
-                EXPECT_TRUE(action == CapacityAction::DECOMMISSIONING);
-            }
-            if (areaCandidate.first == "recom_area")
-            {
-                EXPECT_TRUE(areaCandidate.second == "candidate_1");
-                EXPECT_TRUE(action == CapacityAction::RECOMMISSIONING);
-            }
-        }
-        // we check that the criterion state have been correctly set
-        for (const auto& [areaName, area]: pbg.areas)
-        {
-            if (areaName == "invest_area" || areaName == "recom_area")
-            {
-                EXPECT_TRUE(area.oldCriterionState == CriterionState::HIGHER);
-            }
-            if (areaName == "desinvest_area" || areaName == "decom_area")
-            {
-                EXPECT_TRUE(area.oldCriterionState == CriterionState::LOWER);
-            }
-        }
-        logger->display_message("Test of findAreaCandidatesToModify done!");
-    }
 
-    void assertCandidateBounds(std::shared_ptr<ProblemManager> problemManager,
-                               std::vector<int> candidateIndices,
-                               double expectedUpperBound,
-                               double expectedLowerBound)
-    {
-        double upperBound;
-        double lowerBound;
-        for (const auto& pbId: problemManager->getProblemIds())
+        // run
+        pbg.updateAreaCriteriaData(simuValues);
+        const auto areaCandidatesToModify = pbg.findAreaCandidatesToModify(simuValues);
+
+        // we check that the correct candidate and action have been selected
+        const std::map<std::string, std::pair<std::string, CapacityAction>>
+          expectedModifications = {{"invest_area", {"candidate_1", CapacityAction::INVESTMENT}},
+                                   {"desinvest_area",
+                                    {"candidate_2", CapacityAction::DISINVESTMENT}},
+                                   {"decom_area", {"candidate_2", CapacityAction::DECOMMISSIONING}},
+                                   {"recom_area",
+                                    {"candidate_1", CapacityAction::RECOMMISSIONING}}};
+        for (const auto& [areaCandidate, action]: areaCandidatesToModify)
         {
-            std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
-            for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
-            {
-                problem->get_ub(&upperBound, candidateIndices.at(hour), candidateIndices.at(hour));
-                EXPECT_TRUE(upperBound == expectedUpperBound);
-                problem->get_lb(&lowerBound, candidateIndices.at(hour), candidateIndices.at(hour));
-                EXPECT_TRUE(lowerBound == expectedLowerBound);
-            }
+            const auto& [expectedCandidate, expectedAction] = expectedModifications.at(
+              areaCandidate.first);
+            EXPECT_EQ(areaCandidate.second, expectedCandidate);
+            EXPECT_EQ(action, expectedAction);
+        }
+
+        // we check that the criterion state have been correctly set
+        const std::map<std::string, CriterionState> expectedCriterionStates = {
+          {"invest_area", CriterionState::HIGHER},
+          {"recom_area", CriterionState::HIGHER},
+          {"desinvest_area", CriterionState::LOWER},
+          {"decom_area", CriterionState::LOWER}};
+        for (const auto& [areaName, expectedState]: expectedCriterionStates)
+        {
+            EXPECT_EQ(pbg.areas.at(areaName).oldCriterionState, expectedState);
         }
     }
 
@@ -213,77 +278,54 @@ protected:
                                     const double expectedUpperCapacity,
                                     const double expectedLowerCapacity)
     {
-        // copy study data
-        copyStudyData("with_decom_candidate");
-        // directories and path
-        ConfigurationManager::ConfigDirectories directories{
-          .study_dir = tmpDir,
-          .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-        };
-        const std::filesystem::path iterLogFilePath = directories.simulation_dir
-                                                      / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
-        // instantiation of ProblemGenerationForBalancing
-        BalancingParser balParser(inputBalFilePath);
-        auto problemManager = std::make_shared<ProblemManager>();
-        ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(directories,
-                                                                          balParser.areas,
-                                                                          logger,
-                                                                          problemManager,
-                                                                          iterLogFilePath);
+        auto pbg = makeProblemGeneration("with_decom_candidate");
+        const auto& problemManager = pbg.problemManager;
+        const bool isInvestment = isInvestmentAction(action);
 
-        // set pbg.areas
-        double newBoundRef;
-        int multForUpperBoundLocation;
-        pbg.areas.at(areaName).currentInvestmentIncrement = capacityIncrement;
-        if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
+        // set area increments
+        auto& area = pbg.areas.at(areaName);
+        area.currentInvestmentIncrement = capacityIncrement;
+        if (!isInvestment)
         {
-            auto& candidate = pbg.getInvestmentCandidate(areaName, candidateName);
-            candidate.installedCapacity = 6 * capacityIncrement;
-            // we set initInstalledCapacity lower to allow disinvestment
-            candidate.initInstalledCapacity = 4 * capacityIncrement;
-            pbg.areas.at(areaName).currentInvestmentIncrement = capacityIncrement;
-        }
-        else
-        {
-            auto& candidate = pbg.getDecommissioningCandidate(areaName, candidateName);
-            candidate.installedCapacity = 2 * capacityIncrement;
-            // we set initInstalledCapacity higher to allow recom
-            candidate.initInstalledCapacity = 4 * capacityIncrement;
-            pbg.areas.at(areaName).currentDecommissioningIncrement = capacityIncrement;
+            area.currentDecommissioningIncrement = capacityIncrement;
         }
 
+        // initInstalledCapacity is set lower than installedCapacity to allow disinvestment,
+        // and higher to allow recommissioning
+        const double installedCapacity = (isInvestment ? 6 : 2) * capacityIncrement;
+        const double initInstalledCapacity = 4 * capacityIncrement;
+        visitCandidate(pbg,
+                       areaName,
+                       candidateName,
+                       action,
+                       [&](auto& candidate)
+                       {
+                           candidate.installedCapacity = installedCapacity;
+                           candidate.initInstalledCapacity = initInstalledCapacity;
+                       });
+
+        // set the bounds data of the candidate for each problem
+        std::vector<BoundData> oneWeekBoundData(NUMBER_OF_HOURS_PER_WEEK);
+        for (auto& boundData: oneWeekBoundData)
+        {
+            boundData.lowBoundRatioToUpBound = lBoundRatioToUpBound;
+            boundData.upBoundRatioToInstalledCap = uBoundRatioToInstCap;
+        }
         for (const auto& pbId: problemManager->getProblemIds())
         {
-            std::vector<BoundData> oneWeekBoundData(NUMBER_OF_HOURS_PER_WEEK);
-            for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
-            {
-                oneWeekBoundData.at(hour).lowBoundRatioToUpBound = lBoundRatioToUpBound;
-                oneWeekBoundData.at(hour).upBoundRatioToInstalledCap = uBoundRatioToInstCap;
-            }
-            if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
-            {
-                pbg.getInvestmentCandidate(areaName, candidateName)
-                  .setOneWeekBoundsData(pbId, oneWeekBoundData);
-            }
-            else
-            {
-                pbg.getDecommissioningCandidate(areaName, candidateName)
-                  .setOneWeekBoundsData(pbId, oneWeekBoundData);
-            }
+            visitCandidate(pbg,
+                           areaName,
+                           candidateName,
+                           action,
+                           [&](auto& candidate)
+                           { candidate.setOneWeekBoundsData(pbId, oneWeekBoundData); });
         }
-        std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
-        if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
-        {
-            varIndices = pbg.getInvestmentCandidate(areaName, candidateName).dispProdVarIndices;
-        }
-        else
-        {
-            varIndices = pbg.getDecommissioningCandidate(areaName, candidateName)
-                           .dispProdVarIndices;
-        }
-        auto& area = pbg.areas.at(areaName);
-        std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
+
+        const HourlyIndices varIndices = getDispProdVarIndices(pbg,
+                                                               areaName,
+                                                               candidateName,
+                                                               action);
+        const std::vector<int> vecIndices(varIndices.begin(), varIndices.end());
 
         // run applyActionToCandidate
         std::map<AreaCandidate, CapacityAction> areaCandidatesToModify = {
@@ -291,12 +333,12 @@ protected:
         pbg.initializeCandidatesToModify(areaCandidatesToModify);
         for (const auto& pbId: problemManager->getProblemIds())
         {
-            auto problem = pbg.problemManager->getProblemFromId(pbId);
+            auto problem = problemManager->getProblemFromId(pbId);
             pbg.applyActionToCandidate(pbId, problem, areaCandidatesToModify);
         }
-        // assert results
+
         // we check that new bound of candidate have been correctly set
-        assertCandidateBounds(pbg.problemManager,
+        assertCandidateBounds(problemManager,
                               vecIndices,
                               expectedUpperCapacity,
                               expectedLowerCapacity);
@@ -311,161 +353,88 @@ protected:
                                              const CapacityAction& action,
                                              const double expectedRentability)
     {
-        std::string studyName = "with_decom_candidate";
-        std::string areaName = "area2";
-        const bool isInvestmentAction = action == CapacityAction::INVESTMENT
-                                        || action == CapacityAction::DISINVESTMENT;
-        std::string candidateName = isInvestmentAction ? "invest_peak2" : "unprofitable_peak";
-        // copy dummy data
-        copyStudyData(studyName);
+        const std::string areaName = "area2";
+        const bool isInvestment = isInvestmentAction(action);
+        const std::string candidateName = isInvestment ? "invest_peak2" : "unprofitable_peak";
 
-        // directories and path
-        ConfigurationManager::ConfigDirectories directories{
-          .study_dir = tmpDir,
-          .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-        };
-        const std::filesystem::path iterLogFilePath = directories.simulation_dir
-                                                      / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
-        // instantiation of ProblemGenerationForBalancing
-        BalancingParser balParser(inputBalFilePath);
-        auto problemManager = std::make_shared<ProblemManager>("xpress",
-                                                               "mps",
-                                                               false,
-                                                               true,
-                                                               "initial_problems");
-        ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(directories,
-                                                                          balParser.areas,
-                                                                          logger,
-                                                                          problemManager,
-                                                                          iterLogFilePath);
+        auto pbg = makeProblemGeneration("with_decom_candidate", makeXpressProblemManager());
 
         // set test data
-        // set investment cost and fixed om cost
-        std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
-        if (isInvestmentAction)
+        visitCandidate(pbg,
+                       areaName,
+                       candidateName,
+                       action,
+                       [&](auto& candidate)
+                       {
+                           candidate.installedCapacity = installedCapacity;
+                           candidate.type->fixedOmCosts = fixedOmCosts;
+                           candidate.marginalCost = marginalCost;
+                       });
+        // the cost is named differently for investment and decommissioning candidates
+        if (isInvestment)
         {
-            auto& candidate = pbg.getInvestmentCandidate(areaName, candidateName);
-            candidate.installedCapacity = installedCapacity;
-            candidate.type->investmentCost = investmentCost;
-            candidate.type->fixedOmCosts = fixedOmCosts;
-            candidate.marginalCost = marginalCost;
-            varIndices = candidate.dispProdVarIndices;
+            pbg.getInvestmentCandidate(areaName, candidateName).type->investmentCost
+              = investmentCost;
         }
         else
         {
-            auto& candidate = pbg.getDecommissioningCandidate(areaName, candidateName);
-            candidate.installedCapacity = installedCapacity;
-            candidate.type->decommissioningCost = investmentCost;
-            candidate.type->fixedOmCosts = fixedOmCosts;
-            candidate.marginalCost = marginalCost;
-            varIndices = candidate.dispProdVarIndices;
+            pbg.getDecommissioningCandidate(areaName, candidateName).type->decommissioningCost
+              = investmentCost;
         }
-        // set probleManager.solutions_
-        Antares::Solver::WeeklyProblemId pbId({1, 1});
-        // set arbitrary size of solution big enough to cover candidate indices in each study
-        std::vector<double> solution(3100, 0);
-        for (const auto& idx: varIndices)
+
+        // candidate produces hourlySolutionValue every hour
+        std::vector<double> solution(SOLUTION_SIZE, 0.0);
+        for (const auto& idx: getDispProdVarIndices(pbg, areaName, candidateName, action))
         {
             solution.at(idx) = hourlySolutionValue;
         }
-        pbg.problemManager->setProblemSolution(pbId, solution);
-        // set simuValues
         PbOutput pbOutput;
         std::array<double, NUMBER_OF_HOURS_PER_WEEK> areaPrices;
-        for (int hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
-        {
-            areaPrices.at(hour) = hourlyAreaPrice;
-        }
+        areaPrices.fill(hourlyAreaPrice);
         pbOutput.areaPrices[areaName] = areaPrices;
-        std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues = {{pbId, pbOutput}};
-        // run computeRentabilityForCandidates
-        Area area = pbg.areas.at(areaName);
-        if (isInvestmentAction)
-        {
-            area.initializeRentability(area.investmentCandidates, action);
-        }
-        else
-        {
-            area.initializeRentability(area.decommissioningCandidates, action);
-        }
+
+        // run
+        auto& area = pbg.areas.at(areaName);
+        initializeAreaRentability(area, action);
         area.updateRentabilityWithProblem(action, pbOutput, solution);
 
-        // std::map<std::string, double> rentability;
-        // if (action == CapacityAction::INVESTMENT)
-        // {
-        //     rentability = pbg.computeRentabilityForCandidates(
-        //       areaName,
-        //       pbg.areas.at(areaName).investmentCandidates,
-        //       simuValues,
-        //       action);
-        // }
-        // else
-        // {
-        //     rentability = pbg.computeRentabilityForCandidates(
-        //       areaName,
-        //       pbg.areas.at(areaName).decommissioningCandidates,
-        //       simuValues,
-        //       action);
-        // }
-        // assert results
         // we check that the rentability have been correctly computed
-        EXPECT_TRUE(area.candidatesRentability.at(candidateName) == expectedRentability);
+        EXPECT_DOUBLE_EQ(area.candidatesRentability.at(candidateName), expectedRentability);
     }
 
     void testGetNullRentabilityForCandidates(const std::string& studyFolderName,
                                              const std::string& areaName,
                                              const std::string& candidateName,
                                              const CapacityAction& action)
-
     {
-        // constant used to set capacity data at the same values
-        double capacityValue = 1000;
+        // all capacity data are set at the same value
+        constexpr double capacityValue = 1000;
 
-        // copy study data
-        copyStudyData(studyFolderName);
-        // directories and path
-        ConfigurationManager::ConfigDirectories directories{
-          .study_dir = tmpDir,
-          .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-        };
-        const std::filesystem::path iterLogFilePath = directories.simulation_dir
-                                                      / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(tmpDir / "user/balancing/input_balancing.yml");
-        // instantiation of ProblemGenerationForBalancing
-        BalancingParser balParser(inputBalFilePath);
-        auto problemManager = std::make_shared<ProblemManager>();
-        ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(directories,
-                                                                          balParser.areas,
-                                                                          logger,
-                                                                          problemManager,
-                                                                          iterLogFilePath);
+        auto pbg = makeProblemGeneration(studyFolderName);
 
-        // set simuValues
-        PbOutput pbOutput = {};
-        Antares::Solver::WeeklyProblemId pbId({1, 1});
-        std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues = {{pbId, pbOutput}};
-        // set candidate capacity data and run computeRentabilityForCandidates
-        std::map<std::string, double> rentability;
-        Area area = pbg.areas.at(areaName);
-        if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
+        visitCandidate(pbg,
+                       areaName,
+                       candidateName,
+                       action,
+                       [&](auto& candidate)
+                       {
+                           candidate.installedCapacity = capacityValue;
+                           candidate.initInstalledCapacity = capacityValue;
+                       });
+        if (isInvestmentAction(action))
         {
-            auto& candidate = area.getInvestmentCandidate(candidateName);
-            candidate.installedCapacity = capacityValue;
-            candidate.initInstalledCapacity = capacityValue;
-            candidate.type->expansionPotential = capacityValue;
-            area.initializeRentability(area.investmentCandidates, action);
+            pbg.getInvestmentCandidate(areaName, candidateName).type->expansionPotential
+              = capacityValue;
         }
         else
         {
-            auto& candidate = area.getDecommissioningCandidate(candidateName);
-            candidate.installedCapacity = capacityValue;
-            candidate.initInstalledCapacity = capacityValue;
-            candidate.type->decommissioningPotential = capacityValue;
-            area.initializeRentability(area.decommissioningCandidates, action);
+            pbg.getDecommissioningCandidate(areaName, candidateName).type->decommissioningPotential
+              = capacityValue;
         }
 
-        // assert results
+        auto& area = pbg.areas.at(areaName);
+        initializeAreaRentability(area, action);
+
         // we check that the candidate has been correctly excluded from the selection
         EXPECT_TRUE(area.candidatesRentability.empty());
     }
@@ -474,48 +443,32 @@ protected:
                                      const double expansionPotential,
                                      const double decommissioningPotential,
                                      const CriterionState& criterionState,
-                                     const bool setLastAction,
-                                     const CapacityAction previousAreaAction,
-                                     const std::optional<CapacityAction> expectedCapacityAction)
+                                     const std::optional<CapacityAction>& previousAreaAction,
+                                     const std::optional<CapacityAction>& expectedCapacityAction)
     {
-        // copy study data
-        copyStudyData("with_decom_candidate");
-        // directories and path
-        ConfigurationManager::ConfigDirectories directories{
-          .study_dir = tmpDir,
-          .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-        };
-        const std::filesystem::path iterLogFilePath = directories.simulation_dir
-                                                      / "iterations_values_log.csv";
-        const std::filesystem::path inputBalFilePath(
-          "data_test/balancing/determine_capacity_action/input_balancing.yml");
-        // instantiation of ProblemGenerationForBalancing
-        BalancingParser balParser(inputBalFilePath);
-        auto problemManager = std::make_shared<ProblemManager>();
-        ProblemGenerationForBalancing pbg = ProblemGenerationForBalancing(directories,
-                                                                          balParser.areas,
-                                                                          logger,
-                                                                          problemManager,
-                                                                          iterLogFilePath);
-        // set pbg.areas
-        auto& investCandidate = pbg.getInvestmentCandidate("area2", "invest_semibase");
+        const std::string areaName = "area2";
+        auto pbg = makeProblemGeneration("with_decom_candidate",
+                                         std::make_shared<ProblemManager>(),
+                                         dataTestDir / "determine_capacity_action"
+                                           / "input_balancing.yml");
+
+        // set test data
+        auto& investCandidate = pbg.getInvestmentCandidate(areaName, "invest_semibase");
         investCandidate.initInstalledCapacity = initInstalledCapacity;
         investCandidate.type->expansionPotential = expansionPotential;
-        auto& decomCandidate = pbg.getDecommissioningCandidate("area2", "unprofitable_peak");
+        auto& decomCandidate = pbg.getDecommissioningCandidate(areaName, "unprofitable_peak");
         decomCandidate.initInstalledCapacity = initInstalledCapacity;
         decomCandidate.type->decommissioningPotential = decommissioningPotential;
-        pbg.areas.at("area2").criterionState = criterionState;
-        //  isInvestmentCycle
-        if (setLastAction)
+
+        auto& area = pbg.areas.at(areaName);
+        area.criterionState = criterionState;
+        if (previousAreaAction)
         {
-            pbg.areas.at("area2").lastAction = previousAreaAction;
+            area.lastAction = *previousAreaAction;
         }
-        // run determineCapacityAction
-        std::optional<CapacityAction> resCapacityAction = pbg.determineCapacityAction(
-          pbg.areas.at("area2"));
-        // assert results
+
         // we check that the correct action has been selected
-        EXPECT_TRUE(resCapacityAction == expectedCapacityAction);
+        EXPECT_EQ(pbg.determineCapacityAction(area), expectedCapacityAction);
     }
 };
 
@@ -526,8 +479,6 @@ TEST_F(BalancingTest, findAreaCandidatesToModify)
 
 TEST_F(BalancingTest, applyInvestmentActionToCandidateWithUpperonlyBound)
 {
-    logger->display_message(
-      "Testing of applyActionToCandidate with INVESTMENT and UpperOnly bound ");
     testApplyActionToCandidate("area2",
                                "invest_semibase",
                                CapacityAction::INVESTMENT,
@@ -536,13 +487,10 @@ TEST_F(BalancingTest, applyInvestmentActionToCandidateWithUpperonlyBound)
                                0.0,
                                3500,
                                0.0);
-    logger->display_message(
-      "Test of applyActionToCandidate with INVESTMENT and UpperOnly bound done!");
 }
 
 TEST_F(BalancingTest, applyInvestmentActionToCandidateWithBothBound)
 {
-    logger->display_message("Testing of applyActionToCandidate with INVESTMENT and Both bound");
     testApplyActionToCandidate("area2",
                                "invest_semibase",
                                CapacityAction::INVESTMENT,
@@ -551,12 +499,10 @@ TEST_F(BalancingTest, applyInvestmentActionToCandidateWithBothBound)
                                0.9,
                                3500,
                                3150);
-    logger->display_message("Test of applyActionToCandidate with INVESTMENT and Both bound done!");
 }
 
 TEST_F(BalancingTest, applyInvestmentActionToCandidateWithFixedBound)
 {
-    logger->display_message("Testing of applyActionToCandidate with INVESTMENT and Fixed bound");
     testApplyActionToCandidate("area2",
                                "invest_semibase",
                                CapacityAction::INVESTMENT,
@@ -565,12 +511,10 @@ TEST_F(BalancingTest, applyInvestmentActionToCandidateWithFixedBound)
                                1.0,
                                2800,
                                2800);
-    logger->display_message("Test of applyActionToCandidate with INVESTMENT and Fixed bound done!");
 }
 
 TEST_F(BalancingTest, applyDisinvestmentActionToCandidate)
 {
-    logger->display_message("Testing of applyActionToCandidate with DISINVESTMENT");
     testApplyActionToCandidate("area2",
                                "invest_semibase",
                                CapacityAction::DISINVESTMENT,
@@ -579,12 +523,10 @@ TEST_F(BalancingTest, applyDisinvestmentActionToCandidate)
                                0.9,
                                2500,
                                2250);
-    logger->display_message("Test of applyActionToCandidate with DISINVESTMENT done!");
 }
 
 TEST_F(BalancingTest, applyDecomActionToCandidate)
 {
-    logger->display_message("Testing of applyActionToCandidate with DECOM");
     testApplyActionToCandidate("area2",
                                "unprofitable_peak",
                                CapacityAction::DECOMMISSIONING,
@@ -593,12 +535,10 @@ TEST_F(BalancingTest, applyDecomActionToCandidate)
                                0.9,
                                500,
                                450);
-    logger->display_message("Test of applyActionToCandidate with DECOM done!");
 }
 
 TEST_F(BalancingTest, applyRecomActionToCandidate)
 {
-    logger->display_message("Testing of applyActionToCandidate with RECOM");
     testApplyActionToCandidate("area2",
                                "unprofitable_peak",
                                CapacityAction::RECOMMISSIONING,
@@ -607,12 +547,10 @@ TEST_F(BalancingTest, applyRecomActionToCandidate)
                                0.9,
                                1500,
                                1350);
-    logger->display_message("Test of applyActionToCandidate with RECOM done!");
 }
 
 TEST_F(BalancingTest, computeNonNullRentabilityForCandidates)
 {
-    logger->display_message("Testing compute of non null rentability for candidates");
     // base
     testComputeRentabilityForCandidates(1, 1, 0, 0, 0, 1000, CapacityAction::INVESTMENT, 168);
     // change hourly solution value
@@ -636,12 +574,10 @@ TEST_F(BalancingTest, computeNonNullRentabilityForCandidates)
                                         1000,
                                         CapacityAction::DECOMMISSIONING,
                                         -832);
-    logger->display_message("Test of compute of non null rentability for candidates done!");
 }
 
 TEST_F(BalancingTest, computeNullRentabilityForCandidate)
 {
-    logger->display_message("Testing compute of null rentability for candidates");
     // test with INVESTMENT action
     testGetNullRentabilityForCandidates("one_candidate_per_area",
                                         "area1",
@@ -662,18 +598,18 @@ TEST_F(BalancingTest, computeNullRentabilityForCandidate)
                                         "area2",
                                         "unprofitable_peak",
                                         CapacityAction::RECOMMISSIONING);
-    logger->display_message("Test of compute null rentability for candidates done!");
 }
 
 TEST_F(BalancingTest, determineCapacityAction)
 {
-    logger->display_message("Testing of determineCapacityAction");
+    // arguments: initInstalledCapacity, expansionPotential, decommissioningPotential,
+    //            criterionState, previous area action (nullopt: not set), expected action
+
     // isInvestmentCycle TRUE && isHigher TRUE -> Investment
     testDetermineCapacityAction(0,
                                 3000,
                                 0,
                                 CriterionState::HIGHER,
-                                true,
                                 CapacityAction::INVESTMENT,
                                 CapacityAction::INVESTMENT);
     // isInvestmentCycle TRUE && isHigher TRUE && no invest possible -> Recommissioning
@@ -681,15 +617,13 @@ TEST_F(BalancingTest, determineCapacityAction)
                                 2800,
                                 0,
                                 CriterionState::HIGHER,
-                                false,
-                                CapacityAction::RECOMMISSIONING,
+                                std::nullopt,
                                 CapacityAction::RECOMMISSIONING);
     // isInvestmentCycle TRUE && isHigher FALSE -> Disinvestment
     testDetermineCapacityAction(2500,
                                 0,
                                 0,
                                 CriterionState::LOWER,
-                                true,
                                 CapacityAction::INVESTMENT,
                                 CapacityAction::DISINVESTMENT);
     // isInvestmentCycle TRUE && isHigher FALSE && no disinvest possible -> Decommissioning
@@ -697,7 +631,6 @@ TEST_F(BalancingTest, determineCapacityAction)
                                 0,
                                 4500,
                                 CriterionState::LOWER,
-                                true,
                                 CapacityAction::DISINVESTMENT,
                                 CapacityAction::DECOMMISSIONING);
     // isInvestmentCycle FALSE && isHigher TRUE -> Recommissioning
@@ -705,7 +638,6 @@ TEST_F(BalancingTest, determineCapacityAction)
                                 0,
                                 0,
                                 CriterionState::HIGHER,
-                                true,
                                 CapacityAction::DECOMMISSIONING,
                                 CapacityAction::RECOMMISSIONING);
     // isInvestmentCycle FALSE && isHigher TRUE && no recom possible -> Investment
@@ -713,7 +645,6 @@ TEST_F(BalancingTest, determineCapacityAction)
                                 3000,
                                 0,
                                 CriterionState::HIGHER,
-                                true,
                                 CapacityAction::RECOMMISSIONING,
                                 CapacityAction::INVESTMENT);
     // isInvestmentCycle FALSE && isHigher FALSE -> Decommissioning
@@ -721,7 +652,6 @@ TEST_F(BalancingTest, determineCapacityAction)
                                 0,
                                 4500,
                                 CriterionState::LOWER,
-                                true,
                                 CapacityAction::DECOMMISSIONING,
                                 CapacityAction::DECOMMISSIONING);
     // isInvestmentCycle FALSE && isHigher TRUE && no decom possible -> DISINVESTMENT
@@ -729,16 +659,13 @@ TEST_F(BalancingTest, determineCapacityAction)
                                 0,
                                 5000,
                                 CriterionState::LOWER,
-                                false,
-                                CapacityAction::DECOMMISSIONING,
+                                std::nullopt,
                                 CapacityAction::DISINVESTMENT);
     // no action available
     testDetermineCapacityAction(5000,
                                 2800,
                                 0,
                                 CriterionState::HIGHER,
-                                true,
                                 CapacityAction::INVESTMENT,
                                 std::nullopt);
-    logger->display_message("Test of determineCapacityAction done!");
 }

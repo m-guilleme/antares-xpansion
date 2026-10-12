@@ -16,7 +16,7 @@ class ProblemGenerationForBalancing: public ProblemGenerationOptimSimu
 {
 public:
     explicit ProblemGenerationForBalancing(ConfigurationManager::ConfigDirectories directories,
-                                           std::map<std::string, Area>& areas,
+                                           std::map<std::string, Area> areas,
                                            Logger logger,
                                            std::shared_ptr<ProblemManager> problemManager,
                                            std::filesystem::path iterationsLogFileName);
@@ -26,7 +26,7 @@ public:
     void logAreasView(const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues) const;
     void saveCandidatesResultsToCSV(const std::filesystem::path& outputPath) const;
     void saveAreasViewToCSV(const std::filesystem::path& outputPath) const;
-    void saveIterativeAreasViewToCSV(int iteration) const;
+    void saveIterativeAreasViewToCSV(int iteration);
     void updateAreaCriteriaData(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);
     std::map<AreaCandidate, CapacityAction> findAreaCandidatesToModify(
@@ -55,7 +55,7 @@ public:
         return area.reliabilityStandard + area.reliabilityStandardDeadBandUp;
     }
 
-    std::map<std::string, Area>& areas;
+    std::map<std::string, Area> areas;
 
 private:
     std::map<std::string, CapacityAction> areasAction;

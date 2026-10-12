@@ -76,6 +76,8 @@ int main(int argc, char** argv)
 
         BalancingParser balParser(balancingConfigFilePath);
 
+        std::map<std::string, Area> areas = balParser.parse();
+
         if (!std::filesystem::exists(directories.simulation_dir))
         {
             std::filesystem::create_directories(directories.simulation_dir);
@@ -110,10 +112,19 @@ int main(int argc, char** argv)
                                                                  / "initial_problems");
         std::shared_ptr<ProblemGenerationForBalancing>
           pbg = std::make_shared<ProblemGenerationForBalancing>(directories,
-                                                                balParser.areas,
+                                                                areas,
                                                                 logger,
                                                                 problemManager,
                                                                 iterationsLogFilePath);
+
+        std::shared_ptr<GreedyBalancingFinder> gbf = std::make_shared<GreedyBalancingFinder>(
+          logger,
+          pbg->areas,
+          balParser.getReliabilityStandardIndicator(),
+          pbg->problemManager,
+          solverName,
+          directories.simulation_dir,
+          nbThreads);
         auto endProblemGeneration = std::chrono::system_clock::now();
         logger->display_message("Problems generated", LogUtils::LOGLEVEL::INFO, logger->CONTEXT);
         std::chrono::duration<double> elapsed_seconds = endProblemGeneration
@@ -189,14 +200,6 @@ int main(int argc, char** argv)
                           PROBLEM_GENERATION_LOGGER_CONTEXT);
                     }
                 }
-                std::shared_ptr<GreedyBalancingFinder> gbf = std::make_shared<
-                  GreedyBalancingFinder>(logger,
-                                         balParser.areas,
-                                         balParser.getReliabilityStandardIndicator(),
-                                         pbg->problemManager,
-                                         solverName,
-                                         directories.simulation_dir,
-                                         nbThreads);
                 tbb::parallel_for_each(
                   problemManager->getProblemIds(),
                   [&](const auto& pbId)

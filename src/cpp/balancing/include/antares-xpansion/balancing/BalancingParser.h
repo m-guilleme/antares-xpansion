@@ -237,13 +237,12 @@ class BalancingParser
 public:
     BalancingParser(const std::filesystem::path& pathToYamlConfigFile = "");
 
-    void parse();
+    std::map<std::string, Area> parse();
 
     Benders::Criterion::Type getReliabilityStandardIndicator() const;
 
-    std::map<std::string, Area> areas;
-
 private:
+    std::map<std::string, Area> areas;
     std::filesystem::path pathToYamlConfigFile;
     YAML::Node config;
 

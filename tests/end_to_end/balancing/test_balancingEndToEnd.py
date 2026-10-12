@@ -12,7 +12,7 @@ from .studies import study_parameters, study_values
 
 # Output file produced by the run -> reference file stored with the study
 OUTPUT_TO_REF = {
-    "final_capacities.csv": "final_capacities_ref.csv",  # cluster results
+    "final_capacities.csv": "final_capacities_ref.csv",  # candidates results
     "final_criteria.csv": "final_criteria_ref.csv",  # criterion and area results
     "iterations_values_log.csv": "iterations_values_log_ref.csv",  # iterative logs
 }

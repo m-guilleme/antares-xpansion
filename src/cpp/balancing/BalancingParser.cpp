@@ -150,13 +150,12 @@ BalancingParser::BalancingParser(const std::filesystem::path& pathToYamlConfigFi
             throw std::runtime_error("YAML config file does not exist: "
                                      + pathToYamlConfigFile.string());
         }
-        parse();
     }
 }
 
 /// @brief Parse the YAML configuration file and fill the BalancingParser attributes with the parsed
 /// data
-void BalancingParser::parse()
+std::map<std::string, Area> BalancingParser::parse()
 {
     try
     {
@@ -166,6 +165,7 @@ void BalancingParser::parse()
         parseDecommissioningCandidatesTypes();
         parseInvestmentCandidatesTypes();
         parseAreasSettings();
+        return areas;
     }
     catch (const YAML::Exception& e)
     {

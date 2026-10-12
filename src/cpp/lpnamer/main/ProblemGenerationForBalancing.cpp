@@ -16,12 +16,12 @@
 /// @param solverName The name of the solver to use
 ProblemGenerationForBalancing::ProblemGenerationForBalancing(
   ConfigurationManager::ConfigDirectories directories,
-  std::map<std::string, Area>& areas,
+  std::map<std::string, Area> areas,
   Logger logger,
   std::shared_ptr<ProblemManager> problemManager,
   std::filesystem::path iterationsLogFileName):
     ProblemGenerationOptimSimu(directories, logger, problemManager),
-    areas(areas),
+    areas(std::move(areas)),
     iterationsLogFileName(iterationsLogFileName)
 {
     logger->display_message("Get candidates indices and marginal cost",
@@ -243,7 +243,7 @@ void ProblemGenerationForBalancing::initializeIterativeLogCSV() const
     file << "iteration,zone,criteria,action,cluster candidate,capacity change\n";
 }
 
-void ProblemGenerationForBalancing::saveIterativeAreasViewToCSV(int iteration) const
+void ProblemGenerationForBalancing::saveIterativeAreasViewToCSV(int iteration)
 {
     std::ofstream file(iterationsLogFileName, std::ios_base::app);
     if (!file.is_open())
