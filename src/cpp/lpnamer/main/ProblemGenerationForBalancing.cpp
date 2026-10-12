@@ -111,22 +111,25 @@ void finalizeCandidatesCapacityData(std::map<std::string, Area>& areas)
 
 void ProblemGenerationForBalancing::setCapacitiesDataForCandidates()
 {
-    for (const auto& pbId: problemManager->getProblemIds())
-    {
-        std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
-        for (auto& [areaName, area]: areas)
-        {
-            for (auto& [candidateName, candidate]: area.investmentCandidates)
-            {
-                candidate.setOneWeekCapacityData(pbId, problem);
-            }
+    tbb::parallel_for_each(problemManager->getProblemIds(),
+                           [&](const auto& pbId)
+                           {
+                               std::shared_ptr<Problem> problem = problemManager->getProblemFromId(
+                                 pbId);
+                               for (auto& [areaName, area]: areas)
+                               {
+                                   for (auto& [candidateName, candidate]: area.investmentCandidates)
+                                   {
+                                       candidate.setOneWeekCapacityData(pbId, problem);
+                                   }
 
-            for (auto& [candidateName, candidate]: area.decommissioningCandidates)
-            {
-                candidate.setOneWeekCapacityData(pbId, problem);
-            }
-        }
-    }
+                                   for (auto& [candidateName, candidate]:
+                                        area.decommissioningCandidates)
+                                   {
+                                       candidate.setOneWeekCapacityData(pbId, problem);
+                                   }
+                               }
+                           });
     finalizeCandidatesCapacityData(areas);
 }
 
