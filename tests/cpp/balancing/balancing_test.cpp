@@ -61,18 +61,6 @@ HourlyIndices getDispProdVarIndices(ProblemGenerationForBalancing& pbg,
                           { return candidate.dispProdVarIndices; });
 }
 
-void initializeAreaRentability(Area& area, const CapacityAction& action)
-{
-    if (isInvestmentAction(action))
-    {
-        area.initializeRentability(area.investmentCandidates, action);
-    }
-    else
-    {
-        area.initializeRentability(area.decommissioningCandidates, action);
-    }
-}
-
 std::shared_ptr<ProblemManager> makeXpressProblemManager()
 {
     return std::make_shared<ProblemManager>("xpress", "mps", false, true, "initial_problems");
@@ -395,11 +383,11 @@ protected:
 
         // run
         auto& area = pbg.areas.at(areaName);
-        initializeAreaRentability(area, action);
+        area.initializeRentability(action);
         area.updateRentabilityWithProblem(action, pbOutput, solution);
 
         // we check that the rentability have been correctly computed
-        EXPECT_DOUBLE_EQ(area.candidatesRentability.at(candidateName), expectedRentability);
+        EXPECT_DOUBLE_EQ(area.getCandidatesRentability().at(candidateName), expectedRentability);
     }
 
     void testGetNullRentabilityForCandidates(const std::string& studyFolderName,
@@ -433,10 +421,10 @@ protected:
         }
 
         auto& area = pbg.areas.at(areaName);
-        initializeAreaRentability(area, action);
+        area.initializeRentability(action);
 
         // we check that the candidate has been correctly excluded from the selection
-        EXPECT_TRUE(area.candidatesRentability.empty());
+        EXPECT_TRUE(area.isCandidatesRentabilityEmpty());
     }
 
     void testDetermineCapacityAction(const double initInstalledCapacity,
