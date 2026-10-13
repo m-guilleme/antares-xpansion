@@ -4,15 +4,13 @@
 #include <tbb/global_control.h>
 #include <tbb/parallel_for_each.h>
 
-#include "antares-xpansion/balancing/BalancingParser.h"
+#include "antares-xpansion/balancing/InputBalancingParser.h"
 #include "antares-xpansion/balancing/SettingsConfigReader.h"
 #include "antares-xpansion/bellman_values/ProblemManager.h"
 #include "antares-xpansion/benders/logger/MultithreadTBBLogger.h"
 #include "antares-xpansion/evaluator/GreedyBalancingFinder.h"
 #include "antares-xpansion/exe_options/CommonExeOptions.h"
-#include "antares-xpansion/lpnamer/main/ProblemGenerationForBalancing.h"
-
-using namespace PlainData;
+#include "antares-xpansion/lpnamer/main/Balancing.h"
 
 std::string formatTime(const std::chrono::system_clock::time_point& timePoint)
 {
@@ -35,6 +33,29 @@ std::string formatDuration(std::chrono::duration<T> duration)
       .str();
 }
 
+int clampThreadCount(int requested)
+{
+    const int hardwareMax = static_cast<int>(
+      tbb::global_control::active_value(tbb::global_control::max_allowed_parallelism));
+    return std::clamp(requested, 1, std::max(1, hardwareMax));
+}
+
+std::string describeAction(Balancing& pbg,
+                           const AreaCandidate& areaCandidate,
+                           CapacityAction action,
+                           double previousCapacity)
+{
+    const auto& area = pbg.areas.at(areaCandidate.first);
+    const double newCapacity = pbg.getCandidateCurrentCapacity(action, areaCandidate);
+
+    std::ostringstream os;
+    os << " Area: " << areaCandidate.first << " criteria: " << area.avgCriteria << " ["
+       << pbg.lowerThreshold(area) << "-" << pbg.higherThreshold(area) << "]"
+       << " action: " << to_string(action) << " cluster candidate: " << areaCandidate.second
+       << " new capacity: " << newCapacity << " delta: " << (newCapacity - previousCapacity);
+    return os.str();
+}
+
 int main(int argc, char** argv)
 {
     try
@@ -42,15 +63,11 @@ int main(int argc, char** argv)
         auto optionsParser = CommonExeOptions();
         optionsParser.Parse(argc, argv);
         auto studyPath = optionsParser.StudyPath();
-        int nbThreads = optionsParser.NbThreads();
 
-        // getting the maximum hardware concurrency (default)
-        int max_thread_concurrency = tbb::global_control::active_value(
-          tbb::global_control::max_allowed_parallelism);
-        // limiting the number of TBB threads, as long as this instance is alive
-        tbb::global_control thread_limiter(tbb::global_control::max_allowed_parallelism, nbThreads);
-        // nbThreads shouldn't be larger than the maximum hardware concurrency
-        nbThreads = std::min(nbThreads, max_thread_concurrency);
+        // Clamp BEFORE creating the limiter, otherwise TBB would be limited with the raw value.
+        const int nbThreads = clampThreadCount(optionsParser.NbThreads());
+        // Limits TBB threads as long as this instance is alive
+        tbb::global_control threadLimiter(tbb::global_control::max_allowed_parallelism, nbThreads);
 
         const std::filesystem::path settingsConfigFilePath(studyPath
                                                            / "user/balancing/settings.yml");
@@ -74,7 +91,7 @@ int main(int argc, char** argv)
         const std::filesystem::path balancingConfigFilePath(studyPath
                                                             / "user/balancing/input_balancing.yml");
 
-        BalancingParser balParser(balancingConfigFilePath);
+        InputBalancingParser balParser(balancingConfigFilePath);
 
         std::map<std::string, Area> areas = balParser.parse();
 
@@ -110,12 +127,11 @@ int main(int argc, char** argv)
                                                                cacheProblems,
                                                                directories.simulation_dir
                                                                  / "initial_problems");
-        std::shared_ptr<ProblemGenerationForBalancing>
-          pbg = std::make_shared<ProblemGenerationForBalancing>(directories,
-                                                                areas,
-                                                                logger,
-                                                                problemManager,
-                                                                iterationsLogFilePath);
+        std::shared_ptr<Balancing> pbg = std::make_shared<Balancing>(directories,
+                                                                     areas,
+                                                                     logger,
+                                                                     problemManager,
+                                                                     iterationsLogFilePath);
 
         std::shared_ptr<GreedyBalancingFinder> gbf = std::make_shared<GreedyBalancingFinder>(
           logger,
@@ -185,19 +201,13 @@ int main(int argc, char** argv)
                         double newCandidateCapacity = pbg->getCandidateCurrentCapacity(
                           action,
                           areaCandidate);
-                        logger->display_message(
-                          (std::stringstream()
-                           << " Area: " << areaCandidate.first
-                           << " criteria: " << pbg->areas.at(areaCandidate.first).avgCriteria
-                           << " [" << pbg->lowerThreshold(pbg->areas.at(areaCandidate.first)) << "-"
-                           << pbg->higherThreshold(pbg->areas.at(areaCandidate.first)) << "]"
-                           << " action: " << to_string(action)
-                           << " cluster candidate: " << areaCandidate.second
-                           << " new capacity: " << newCandidateCapacity << " delta: "
-                           << (newCandidateCapacity - previousCandidateCapacity[areaCandidate]))
-                            .str(),
-                          LogUtils::LOGLEVEL::INFO,
-                          PROBLEM_GENERATION_LOGGER_CONTEXT);
+                        logger->display_message(describeAction(*pbg,
+                                                               areaCandidate,
+                                                               action,
+                                                               previousCandidateCapacity.at(
+                                                                 areaCandidate)),
+                                                LogUtils::LOGLEVEL::INFO,
+                                                PROBLEM_GENERATION_LOGGER_CONTEXT);
                     }
                 }
                 tbb::parallel_for_each(

@@ -4,7 +4,7 @@
 #include <string>
 
 #include "ConfigurationManager.h"
-#include "antares-xpansion/balancing/BalancingParser.h"
+#include "antares-xpansion/balancing/InputBalancingParser.h"
 #include "antares-xpansion/evaluator/GreedyBalancingFinder.h"
 #include "antares-xpansion/lpnamer/main/ProblemGenerationOptimSimu.h"
 #include "antares-xpansion/lpnamer/model/Problem.h"
@@ -12,15 +12,15 @@
 using AreaCandidate = std::pair<std::string, std::string>;
 
 /// @brief Class to generate and modify problems in memory
-class ProblemGenerationForBalancing: public ProblemGenerationOptimSimu
+class Balancing: public ProblemGenerationOptimSimu
 {
 public:
-    explicit ProblemGenerationForBalancing(ConfigurationManager::ConfigDirectories directories,
-                                           std::map<std::string, Area> areas,
-                                           Logger logger,
-                                           std::shared_ptr<ProblemManager> problemManager,
-                                           std::filesystem::path iterationsLogFileName);
-    virtual ~ProblemGenerationForBalancing() = default;
+    explicit Balancing(ConfigurationManager::ConfigDirectories directories,
+                       std::map<std::string, Area> areas,
+                       Logger logger,
+                       std::shared_ptr<ProblemManager> problemManager,
+                       std::filesystem::path iterationsLogFileName);
+    virtual ~Balancing() = default;
     bool isBalanced() const;
     bool isBlocked() const;
     void logAreasView(const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues) const;

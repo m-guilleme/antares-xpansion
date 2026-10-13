@@ -11,11 +11,11 @@ find_package(yaml-cpp CONFIG REQUIRED)
 add_library(balancing_lib STATIC)
 
 target_sources(balancing_lib PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/BalancingParser.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/InputBalancingParser.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/SettingsConfigReader.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Candidate.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Area.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/BalancingParser.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/InputBalancingParser.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/SettingsConfigReader.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/Candidate.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/Area.h

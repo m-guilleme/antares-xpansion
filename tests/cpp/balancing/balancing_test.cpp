@@ -1,3 +1,5 @@
+#include "antares-xpansion/lpnamer/main/Balancing.h"
+
 #include <array>
 #include <filesystem>
 #include <iostream>
@@ -9,14 +11,13 @@
 #include <vector>
 
 #include "RandomDirGenerator.h"
-#include "antares-xpansion/balancing/BalancingParser.h"
+#include "antares-xpansion/balancing/InputBalancingParser.h"
 #include "antares-xpansion/balancing/SettingsConfigReader.h"
 #include "antares-xpansion/bellman_values/ProblemManager.h"
 #include "antares-xpansion/benders/logger/FilteredLogger.h"
 #include "antares-xpansion/benders/logger/Master.h"
 #include "antares-xpansion/benders/logger/User.h"
 #include "antares-xpansion/evaluator/GreedyBalancingFinder.h"
-#include "antares-xpansion/lpnamer/main/ProblemGenerationForBalancing.h"
 #include "gtest/gtest.h"
 
 namespace
@@ -35,7 +36,7 @@ bool isInvestmentAction(const CapacityAction& action)
 // decommissioning candidate (DECOMMISSIONING / RECOMMISSIONING) matching the action.
 // func must be a generic lambda returning the same type for both candidate types.
 template<typename Func>
-auto visitCandidate(ProblemGenerationForBalancing& pbg,
+auto visitCandidate(Balancing& pbg,
                     const std::string& areaName,
                     const std::string& candidateName,
                     const CapacityAction& action,
@@ -48,7 +49,7 @@ auto visitCandidate(ProblemGenerationForBalancing& pbg,
     return func(pbg.getDecommissioningCandidate(areaName, candidateName));
 }
 
-HourlyIndices getDispProdVarIndices(ProblemGenerationForBalancing& pbg,
+HourlyIndices getDispProdVarIndices(Balancing& pbg,
                                     const std::string& areaName,
                                     const std::string& candidateName,
                                     const CapacityAction& action)
@@ -128,7 +129,7 @@ protected:
 
     // Copies the study into a temporary directory and builds a ProblemGenerationForBalancing
     // from it. The balancing config is read from the copied study unless inputBalFilePath is set.
-    ProblemGenerationForBalancing makeProblemGeneration(
+    Balancing makeProblemGeneration(
       const std::string& studyName,
       const std::shared_ptr<ProblemManager>& problemManager = std::make_shared<ProblemManager>(),
       const std::optional<std::filesystem::path>& inputBalFilePath = std::nullopt)
@@ -141,14 +142,10 @@ protected:
         };
         const std::filesystem::path iterLogFilePath = directories.simulation_dir
                                                       / "iterations_values_log.csv";
-        BalancingParser balParser(
+        InputBalancingParser balParser(
           inputBalFilePath.value_or(tmpDir / "user" / "balancing" / "input_balancing.yml"));
         std::map<std::string, Area> areas = balParser.parse();
-        return ProblemGenerationForBalancing(directories,
-                                             areas,
-                                             logger,
-                                             problemManager,
-                                             iterLogFilePath);
+        return Balancing(directories, areas, logger, problemManager, iterLogFilePath);
     }
 
     void testFindAreaCandidatesToModify()
@@ -163,8 +160,8 @@ protected:
         auto pbg = makeProblemGeneration("one_candidate_per_area", makeXpressProblemManager());
 
         // set real test data
-        BalancingParser balParser(dataTestDir / "find_area_cluster_to_modify"
-                                  / "input_balancing.yml");
+        InputBalancingParser balParser(dataTestDir / "find_area_cluster_to_modify"
+                                       / "input_balancing.yml");
         pbg.areas = balParser.parse();
 
         constexpr double capacity = 1000;

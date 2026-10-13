@@ -11,10 +11,10 @@
 #include "antares-xpansion/benders/benders_core/CriterionInputDataReader.h"
 #include "antares-xpansion/lpnamer/model/Problem.h"
 
-class BalancingParser
+class InputBalancingParser
 {
 public:
-    BalancingParser(const std::filesystem::path& pathToYamlConfigFile = "");
+    InputBalancingParser(const std::filesystem::path& pathToYamlConfigFile = "");
 
     std::map<std::string, Area> parse();
 

@@ -16,14 +16,14 @@ target_sources(problem_generation_main PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/ConfigurationManager.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ProblemGeneration.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ProblemGenerationForWaterValueCalculation.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/ProblemGenerationForBalancing.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Balancing.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ProblemGenerationOptimSimu.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ProblemGenerationExeOptions.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Version.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/lpnamer/main/ConfigurationManager.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/lpnamer/main/ProblemGeneration.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/lpnamer/main/ProblemGenerationForWaterValueCalculation.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/lpnamer/main/ProblemGenerationForBalancing.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/lpnamer/main/Balancing.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/lpnamer/main/ProblemGenerationOptimSimu.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/lpnamer/main/ProblemGenerationOptions.h
         ${CMAKE_CURRENT_SOURCE_DIR}/private/Version.h

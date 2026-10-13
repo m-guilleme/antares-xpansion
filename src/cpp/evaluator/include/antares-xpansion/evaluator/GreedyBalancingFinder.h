@@ -2,7 +2,7 @@
 
 #include <antares/solver/lps/LpsFromAntares.h>
 
-#include "antares-xpansion/balancing/BalancingParser.h"
+#include "antares-xpansion/balancing/InputBalancingParser.h"
 #include "antares-xpansion/benders/benders_core/CriterionComputation.h"
 #include "antares-xpansion/evaluator/Evaluator.h"
 #include "antares-xpansion/xpansion_interfaces/ILogger.h"
