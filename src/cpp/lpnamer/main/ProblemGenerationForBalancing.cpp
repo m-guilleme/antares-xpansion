@@ -38,6 +38,42 @@ ProblemGenerationForBalancing::ProblemGenerationForBalancing(
     initializeIterativeLogCSV();
 }
 
+// Calls f(candidate) on every investment and decommissioning candidate of every area
+template<typename Func>
+static void forEachCandidate(std::map<std::string, Area>& areas, Func&& f)
+{
+    for (auto& [areaName, area]: areas)
+    {
+        for (auto& [candidateName, candidate]: area.investmentCandidates)
+        {
+            f(candidate);
+        }
+        for (auto& [candidateName, candidate]: area.decommissioningCandidates)
+        {
+            f(candidate);
+        }
+    }
+}
+
+static std::unordered_map<std::string, size_t> buildVarToIndex(const std::vector<std::string>& vars)
+{
+    std::unordered_map<std::string, size_t> index;
+    index.reserve(vars.size());
+    for (size_t i = 0; i < vars.size(); ++i)
+    {
+        // convert the source string to lower case
+        std::string lowerString;
+        lowerString.resize(vars[i].size());
+        std::transform(vars[i].begin(),
+                       vars[i].end(),
+                       lowerString.begin(),
+                       [](unsigned char c) { return char(std::tolower(c)); });
+        // add pair
+        index.emplace(lowerString, i);
+    }
+    return index;
+}
+
 /// @brief Fill the DispatchableProduction variable indices and marginal cost for a given area
 /// @param areaName The name of the area to process
 /// @param candidateName The name of the cluster candidate to process
@@ -78,80 +114,6 @@ void ProblemGenerationForBalancing::fillDispProdVarIndicesAndMarginalCostsForAre
     }
 }
 
-void finalizeCandidatesCapacityData(std::map<std::string, Area>& areas)
-{
-    auto updateUpBoundRatioToInstalledCap = [&]<typename T>(Candidate<T>& candidate)
-    {
-        for (auto& [pbId, oneWeekBoundData]: candidate.boundsData)
-        {
-            for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
-            {
-                oneWeekBoundData[hour].upBoundRatioToInstalledCap
-                  = oneWeekBoundData[hour].upBoundRatioToInstalledCap == candidate.installedCapacity
-                      ? 1.
-                    : candidate.installedCapacity > 0.0
-                      ? oneWeekBoundData[hour].upBoundRatioToInstalledCap
-                          / candidate.installedCapacity
-                      : 0.0;
-            }
-        }
-    };
-    for (auto& [areaName, area]: areas)
-    {
-        for (auto& [candidateName, candidate]: area.investmentCandidates)
-        {
-            updateUpBoundRatioToInstalledCap(candidate);
-        }
-        for (auto& [candidateName, candidate]: area.decommissioningCandidates)
-        {
-            updateUpBoundRatioToInstalledCap(candidate);
-        }
-    }
-}
-
-void ProblemGenerationForBalancing::setCapacitiesDataForCandidates()
-{
-    tbb::parallel_for_each(problemManager->getProblemIds(),
-                           [&](const auto& pbId)
-                           {
-                               std::shared_ptr<Problem> problem = problemManager->getProblemFromId(
-                                 pbId);
-                               for (auto& [areaName, area]: areas)
-                               {
-                                   for (auto& [candidateName, candidate]: area.investmentCandidates)
-                                   {
-                                       candidate.setOneWeekCapacityData(pbId, problem);
-                                   }
-
-                                   for (auto& [candidateName, candidate]:
-                                        area.decommissioningCandidates)
-                                   {
-                                       candidate.setOneWeekCapacityData(pbId, problem);
-                                   }
-                               }
-                           });
-    finalizeCandidatesCapacityData(areas);
-}
-
-static std::unordered_map<std::string, size_t> buildVarToIndex(const std::vector<std::string>& vars)
-{
-    std::unordered_map<std::string, size_t> index;
-    index.reserve(vars.size());
-    for (size_t i = 0; i < vars.size(); ++i)
-    {
-        // convert the source string to lower case
-        std::string lowerString;
-        lowerString.resize(vars[i].size());
-        std::transform(vars[i].begin(),
-                       vars[i].end(),
-                       lowerString.begin(),
-                       [](unsigned char c) { return char(std::tolower(c)); });
-        // add pair
-        index.emplace(lowerString, i);
-    }
-    return index;
-}
-
 /// @brief Update the problems for the balancing calculation
 void ProblemGenerationForBalancing::fillDispProdVarIndicesAndMarginalCosts()
 {
@@ -187,6 +149,41 @@ void ProblemGenerationForBalancing::fillDispProdVarIndicesAndMarginalCosts()
                                                           objCoeffs);
         }
     }
+}
+
+void ProblemGenerationForBalancing::prepareCandidatesBoundsData(
+  const std::set<Antares::Solver::WeeklyProblemId>& pbIds)
+{
+    forEachCandidate(areas, [&](CandidateBase& c) { c.prepareBoundsData(pbIds); });
+}
+
+// Parallel: each task writes only to boundsData[pbId]
+void ProblemGenerationForBalancing::computeCandidatesBoundsData(
+  const std::set<Antares::Solver::WeeklyProblemId>& pbIds)
+{
+    tbb::parallel_for_each(pbIds,
+                           [&](const auto& pbId)
+                           {
+                               const auto problem = problemManager->getProblemFromId(pbId);
+                               forEachCandidate(areas,
+                                                [&](CandidateBase& c) {
+                                                    c.computeAndSetOneWeekCapacityData(pbId,
+                                                                                       problem);
+                                                });
+                           });
+}
+
+void ProblemGenerationForBalancing::updateCandidatesCapacities()
+{
+    forEachCandidate(areas, [](CandidateBase& c) { c.updateCapacitiesFromBounds(); });
+}
+
+void ProblemGenerationForBalancing::setCapacitiesDataForCandidates()
+{
+    const auto& pbIds = problemManager->getProblemIds();
+    prepareCandidatesBoundsData(pbIds);
+    computeCandidatesBoundsData(pbIds);
+    updateCandidatesCapacities();
 }
 
 void ProblemGenerationForBalancing::logAreasView(
@@ -502,14 +499,7 @@ std::map<AreaCandidate, CapacityAction> ProblemGenerationForBalancing::findAreaC
             areasAction[areaName] = action.value();
             const bool isInvestmentAction = action == CapacityAction::INVESTMENT
                                             || action == CapacityAction::DISINVESTMENT;
-            if (isInvestmentAction)
-            {
-                area.initializeRentability(area.investmentCandidates, action.value());
-            }
-            else
-            {
-                area.initializeRentability(area.decommissioningCandidates, action.value());
-            }
+            area.initializeRentability(action.value());
         }
     }
 

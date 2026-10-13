@@ -79,5 +79,9 @@ private:
     void computeCandidateInstalledCapacity(CapacityAction action,
                                            Area& area,
                                            const std::string& candidateName);
+    void prepareCandidatesBoundsData(const std::set<Antares::Solver::WeeklyProblemId>& pbIds);
+    void computeCandidatesBoundsData(const std::set<Antares::Solver::WeeklyProblemId>& pbIds);
+    void updateCandidatesCapacities();
+
     friend class BalancingTest;
 };
