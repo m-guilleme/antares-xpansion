@@ -140,12 +140,10 @@ protected:
           .study_dir = tmpDir,
           .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
         };
-        const std::filesystem::path iterLogFilePath = directories.simulation_dir
-                                                      / "iterations_values_log.csv";
         InputBalancingParser balParser(
           inputBalFilePath.value_or(tmpDir / "user" / "balancing" / "input_balancing.yml"));
         std::map<std::string, Area> areas = balParser.parse();
-        return Balancing(directories, areas, logger, problemManager, iterLogFilePath);
+        return Balancing(directories, areas, logger, problemManager);
     }
 
     void testFindAreaCandidatesToModify()

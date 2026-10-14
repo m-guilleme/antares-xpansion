@@ -19,6 +19,7 @@ target_sources(balancing_lib PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/SettingsConfigReader.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/Candidate.h
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/Area.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/utils.h
 )
 
 target_link_libraries(balancing_lib

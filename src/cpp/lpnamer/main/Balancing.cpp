@@ -1,4 +1,5 @@
 
+
 #include "antares-xpansion/lpnamer/main/Balancing.h"
 
 #include <iostream>
@@ -9,6 +10,8 @@
 #include <antares/api/solver.h>
 #include <antares/solver/lps/LpsFromAntares.h>
 
+#include "antares-xpansion/balancing/utils.h"
+
 /// @brief Launch the simulation and save the problems
 /// @param directories The directories to use for the problems generation
 /// @param areas The area investments to use for the problems modification
@@ -17,11 +20,9 @@
 Balancing::Balancing(ConfigurationManager::ConfigDirectories directories,
                      std::map<std::string, Area> areas,
                      Logger logger,
-                     std::shared_ptr<ProblemManager> problemManager,
-                     std::filesystem::path iterationsLogFileName):
+                     std::shared_ptr<ProblemManager> problemManager):
     ProblemGenerationOptimSimu(directories, logger, problemManager),
-    areas(std::move(areas)),
-    iterationsLogFileName(iterationsLogFileName)
+    areas(std::move(areas))
 {
     logger->display_message("Get candidates indices and marginal cost",
                             LogUtils::LOGLEVEL::INFO,
@@ -31,10 +32,6 @@ Balancing::Balancing(ConfigurationManager::ConfigDirectories directories,
                             LogUtils::LOGLEVEL::INFO,
                             PROBLEM_GENERATION_LOGGER_CONTEXT);
     setCapacitiesDataForCandidates();
-    logger->display_message("Initialize logs",
-                            LogUtils::LOGLEVEL::INFO,
-                            PROBLEM_GENERATION_LOGGER_CONTEXT);
-    initializeIterativeLogCSV();
 }
 
 // Calls f(candidate) on every investment and decommissioning candidate of every area
@@ -643,7 +640,7 @@ void Balancing::logAreasView(
     }
 }
 
-void Balancing::initializeIterativeLogCSV() const
+void Balancing::initializeIterativeLogCSV(const std::filesystem::path iterationsLogFileName) const
 {
     std::ofstream file(iterationsLogFileName);
     if (!file.is_open())
@@ -655,7 +652,8 @@ void Balancing::initializeIterativeLogCSV() const
     file << "iteration,zone,criteria,action,cluster candidate,capacity change\n";
 }
 
-void Balancing::saveIterativeAreasViewToCSV(int iteration)
+void Balancing::saveIterativeAreasViewToCSV(int iteration,
+                                            const std::filesystem::path& iterationsLogFileName)
 {
     std::ofstream file(iterationsLogFileName, std::ios_base::app);
     if (!file.is_open())
@@ -763,4 +761,133 @@ void Balancing::saveAreasViewToCSV(const std::filesystem::path& outputPath) cons
              << lowerThreshold(area) << "," << higherThreshold(area) << "," << status << ","
              << totalCapacityChange << "\n";
     }
+}
+
+std::string Balancing::describeAction(const AreaCandidate& areaCandidate,
+                                      CapacityAction action,
+                                      double previousCapacity)
+{
+    const auto& area = areas.at(areaCandidate.first);
+    const double newCapacity = getCandidateCurrentCapacity(action, areaCandidate);
+
+    std::ostringstream os;
+    os << " Area: " << areaCandidate.first << " criteria: " << area.avgCriteria << " ["
+       << lowerThreshold(area) << "-" << higherThreshold(area) << "]"
+       << " action: " << to_string(action) << " cluster candidate: " << areaCandidate.second
+       << " new capacity: " << newCapacity << " delta: " << (newCapacity - previousCapacity);
+    return os.str();
+}
+
+void Balancing::run(const int maxIterations, GreedyBalancingFinder& gbf)
+{
+    // logs containing all values for every iteration
+    const std::filesystem::path iterationsLogFilePath = directories.simulation_dir
+                                                        / "iterations_values_log.csv";
+    // logs containing all values reached at the end of the simulation
+    const std::filesystem::path finalCriteriaFilePath = directories.simulation_dir
+                                                        / "final_criteria.csv";
+
+    logger->display_message("Initialize logs",
+                            LogUtils::LOGLEVEL::INFO,
+                            PROBLEM_GENERATION_LOGGER_CONTEXT);
+    initializeIterativeLogCSV(iterationsLogFilePath);
+
+    std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues;
+    // First iteration will be iteration 0 (the iteration before any modification is applied to
+    // the problems)
+    int iteration = -1;
+    auto startBalancingProcess = std::chrono::system_clock::now();
+    logger->display_message("Starting balancing process",
+                            LogUtils::LOGLEVEL::INFO,
+                            logger->CONTEXT);
+    logAreasView(simuValues);
+    bool blocked = false;
+    while (!isBalanced() && !blocked && iteration < maxIterations)
+    {
+        iteration++;
+        auto startIteration = std::chrono::system_clock::now();
+        logger->display_message("Iteration " + std::to_string(iteration),
+                                LogUtils::LOGLEVEL::INFO,
+                                logger->CONTEXT);
+        std::map<AreaCandidate, CapacityAction> areaCandidatesToModify;
+        // For the first iteration, simuValues is empty and no modification should be applied
+        if (!simuValues.empty())
+        {
+            areaCandidatesToModify = findAreaCandidatesToModify(simuValues);
+        }
+        if (areaCandidatesToModify.empty() && iteration > 0)
+        {
+            logger->display_message(
+              (std::stringstream() << "No actions found in any area, stop the run").str(),
+              LogUtils::LOGLEVEL::INFO,
+              PROBLEM_GENERATION_LOGGER_CONTEXT);
+            blocked = true;
+        }
+        else
+        {
+            std::map<AreaCandidate, double> previousCandidateCapacity;
+            if (!areaCandidatesToModify.empty())
+            {
+                logger->display_message("Apply action",
+                                        LogUtils::LOGLEVEL::INFO,
+                                        PROBLEM_GENERATION_LOGGER_CONTEXT);
+                for (const auto& [areaCandidate, action]: areaCandidatesToModify)
+                {
+                    previousCandidateCapacity[areaCandidate] = getCandidateCurrentCapacity(
+                      action,
+                      areaCandidate);
+                }
+                initializeCandidatesToModify(areaCandidatesToModify);
+                for (const auto& [areaCandidate, action]: areaCandidatesToModify)
+                {
+                    double newCandidateCapacity = getCandidateCurrentCapacity(action,
+                                                                              areaCandidate);
+                    logger->display_message(describeAction(areaCandidate,
+                                                           action,
+                                                           previousCandidateCapacity.at(
+                                                             areaCandidate)),
+                                            LogUtils::LOGLEVEL::INFO,
+                                            PROBLEM_GENERATION_LOGGER_CONTEXT);
+                }
+            }
+            tbb::parallel_for_each(
+              problemManager->getProblemIds(),
+              [&](const auto& pbId)
+              {
+                  std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
+                  if (!areaCandidatesToModify.empty())
+                  {
+                      applyActionToCandidate(pbId, problem, areaCandidatesToModify);
+                  }
+                  gbf.computeCriterionAndPrice(pbId, problem);
+              });
+            simuValues = gbf.getBalancingResults();
+
+            auto endIteration = std::chrono::system_clock::now();
+            saveIterativeAreasViewToCSV(iteration, iterationsLogFilePath);
+            updateAreaCriteriaData(simuValues);
+            logAreasView(simuValues);
+            std::chrono::duration<double> elapsed_iteration_seconds = endIteration - startIteration;
+            logger->display_message("Elapsed time for iteration " + std::to_string(iteration) + ": "
+                                      + formatDuration(elapsed_iteration_seconds),
+                                    LogUtils::LOGLEVEL::INFO,
+                                    logger->CONTEXT);
+        }
+    };
+    logger->display_message("Final iteration " + std::to_string(++iteration),
+                            LogUtils::LOGLEVEL::INFO,
+                            logger->CONTEXT);
+    logAreasView(simuValues);
+    saveCandidatesResultsToCSV(directories.simulation_dir / "final_capacities.csv");
+    saveAreasViewToCSV(finalCriteriaFilePath);
+    auto endProblemUpdate = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_update_seconds = endProblemUpdate - startBalancingProcess;
+    logger->display_message("Balancing process ended after " + std::to_string(iteration)
+                              + " iterations. In " + formatDuration(elapsed_update_seconds),
+                            LogUtils::LOGLEVEL::INFO,
+                            logger->CONTEXT);
+    logger->display_message(isBalanced() ? "The system is balanced."
+                                         : "The system is not balanced.",
+                            LogUtils::LOGLEVEL::INFO,
+                            logger->CONTEXT);
 }

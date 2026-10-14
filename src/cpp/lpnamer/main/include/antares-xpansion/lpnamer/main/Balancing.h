@@ -18,15 +18,15 @@ public:
     explicit Balancing(ConfigurationManager::ConfigDirectories directories,
                        std::map<std::string, Area> areas,
                        Logger logger,
-                       std::shared_ptr<ProblemManager> problemManager,
-                       std::filesystem::path iterationsLogFileName);
+                       std::shared_ptr<ProblemManager> problemManager);
     virtual ~Balancing() = default;
     bool isBalanced() const;
     bool isBlocked() const;
     void logAreasView(const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues) const;
     void saveCandidatesResultsToCSV(const std::filesystem::path& outputPath) const;
     void saveAreasViewToCSV(const std::filesystem::path& outputPath) const;
-    void saveIterativeAreasViewToCSV(int iteration);
+    void saveIterativeAreasViewToCSV(int iteration,
+                                     const std::filesystem::path& iterationsLogFileName);
     void updateAreaCriteriaData(
       const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues);
     std::map<AreaCandidate, CapacityAction> findAreaCandidatesToModify(
@@ -56,12 +56,13 @@ public:
     }
 
     std::map<std::string, Area> areas;
+    void run(const int maxIterations, GreedyBalancingFinder& gbf);
 
 private:
     std::map<std::string, CapacityAction> areasAction;
     std::filesystem::path iterationsLogFileName;
 
-    void initializeIterativeLogCSV() const;
+    void initializeIterativeLogCSV(const std::filesystem::path iterationsLogFileName) const;
     void fillDispProdVarIndicesAndMarginalCosts();
     void setCapacitiesDataForCandidates();
     CriterionState computeCriterionState(const Area& area, double value) const;
@@ -82,6 +83,9 @@ private:
     void prepareCandidatesBoundsData(const std::set<Antares::Solver::WeeklyProblemId>& pbIds);
     void computeCandidatesBoundsData(const std::set<Antares::Solver::WeeklyProblemId>& pbIds);
     void updateCandidatesCapacities();
+    std::string describeAction(const AreaCandidate& areaCandidate,
+                               CapacityAction action,
+                               double previousCapacity);
 
     friend class BalancingTest;
 };
