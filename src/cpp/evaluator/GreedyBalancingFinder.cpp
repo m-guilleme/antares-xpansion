@@ -14,6 +14,26 @@
 
 using namespace PlainData;
 
+namespace
+{
+/// @brief Build the patterns to use for the criterion computation
+/// @param criterion The criterion to evaluate
+/// @param areasName The area investments name to use for the evaluation
+/// @return The criterion input data containing the patterns to use for the criterion
+/// computation
+Benders::Criterion::CriterionInputData buildPatterns(Benders::Criterion::Type criterion,
+                                                     const std::vector<std::string>& areasName)
+{
+    Benders::Criterion::CriterionInputData ret{criterion};
+    for (const auto& area: areasName)
+    {
+        Benders::Criterion::CriterionSingleInputData singleInputData(getPrefix(criterion), area, 1);
+        ret.AddSingleData(singleInputData);
+    }
+    return ret;
+}
+} // namespace
+
 /// @brief Constructor of the GreedyBalancingFinder class
 /// @param logger The logger to use for the evaluation
 /// @param areas The area investments to use for the evaluation
@@ -22,16 +42,16 @@ using namespace PlainData;
 /// @param solverName The name of the solver to use for the evaluation
 /// @param nbThreads The number of threads to use for the evaluation
 GreedyBalancingFinder::GreedyBalancingFinder(Logger logger,
-                                             const std::map<std::string, Area>& areas,
+                                             const std::vector<std::string> areasName,
                                              Benders::Criterion::Type criterion,
                                              std::shared_ptr<ProblemManager> problemManager,
                                              std::string solverName,
                                              std::filesystem::path studyDir,
                                              int nbThreads):
     Evaluator(logger, problemManager, studyDir, solverName, nbThreads),
-    areas(areas)
+    areasName(std::move(areasName))
 {
-    auto criterionInputData = buildPatterns(criterion, areas);
+    auto criterionInputData = buildPatterns(criterion, areasName);
     setCriterionComputationInputs(criterionInputData);
 }
 
@@ -43,24 +63,6 @@ std::map<Antares::Solver::WeeklyProblemId, PbOutput> GreedyBalancingFinder::getB
         res[key] = value;
     }
     return res;
-}
-
-/// @brief Build the patterns to use for the criterion computation
-/// @param criterion The criterion to evaluate
-/// @param areas The area investments to use for the evaluation
-/// @return The criterion input data containing the patterns to use for the criterion computation
-Benders::Criterion::CriterionInputData GreedyBalancingFinder::buildPatterns(
-  Benders::Criterion::Type criterion,
-  const std::map<std::string, Area>& areas)
-{
-    Benders::Criterion::CriterionInputData ret{criterion};
-    for (const auto& area: areas | std::views::keys)
-    {
-        Benders::Criterion::CriterionSingleInputData singleInputData(getPrefix(criterion), area, 1);
-        ret.AddSingleData(singleInputData);
-    }
-
-    return ret;
 }
 
 /// @brief Get the indices of the area balance constraints in the problem
@@ -75,7 +77,7 @@ std::vector<size_t> GreedyBalancingFinder::getAreaBalanceIndices(
     constexpr std::string_view hourTag = "::hour";
 
     std::unordered_set<std::string_view> areasView;
-    for (const auto& [name, _]: areas)
+    for (const auto& name: areasName)
     {
         areasView.insert(name);
     }

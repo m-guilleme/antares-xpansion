@@ -86,6 +86,9 @@ int runBalancing(int argc, char** argv)
 
     InputBalancingParser inputBalancingParser(studyPath / INPUT_BALANCING_FILE);
     const std::map<std::string, Area> areas = inputBalancingParser.parse();
+    auto areasNameView = std::views::keys(areas);
+    const std::vector<std::string> areasName{areasNameView.begin(), areasNameView.end()};
+
     Benders::Criterion::Type relibilityStandardIndicator = inputBalancingParser
                                                              .getReliabilityStandardIndicator();
 
@@ -108,7 +111,7 @@ int runBalancing(int argc, char** argv)
                                                              / INITIAL_PROBLEMS_FOLDER);
     Balancing balancing(directories, areas, logger, problemManager);
     GreedyBalancingFinder balancingFinder(logger,
-                                          areas,
+                                          areasName,
                                           relibilityStandardIndicator,
                                           problemManager,
                                           solverName,
