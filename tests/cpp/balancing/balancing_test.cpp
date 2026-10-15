@@ -453,6 +453,30 @@ protected:
         // we check that the correct action has been selected
         EXPECT_EQ(pbg.determineCapacityAction(area), expectedCapacityAction);
     }
+
+    void testMaxOscillationReached()
+    {
+        auto pbg = makeProblemGeneration("one_candidate_per_area", makeXpressProblemManager());
+        const AreaActions area1InvestmentAction{
+          {{"area1", "invest_peak*1"}, CapacityAction::INVESTMENT},
+        };
+        const AreaActions area1DisinvestmentAction{
+          {{"area1", "invest_peak*1"}, CapacityAction::DISINVESTMENT},
+        };
+        for (int idx = 0; idx < 11; idx++)
+        {
+            EXPECT_FALSE(pbg.areas.at("area1").maxOscillationReached());
+            if (idx % 2 == 0)
+            {
+                pbg.prepareCandidatesToModify(area1InvestmentAction);
+            }
+            else
+            {
+                pbg.prepareCandidatesToModify(area1DisinvestmentAction);
+            }
+        }
+        EXPECT_TRUE(pbg.areas.at("area1").maxOscillationReached());
+    }
 };
 
 TEST_F(BalancingTest, findAreaCandidatesToModify)
@@ -651,4 +675,9 @@ TEST_F(BalancingTest, determineCapacityAction)
                                 CriterionState::HIGHER,
                                 CapacityAction::INVESTMENT,
                                 std::nullopt);
+}
+
+TEST_F(BalancingTest, masOscillationReached)
+{
+    testMaxOscillationReached();
 }
