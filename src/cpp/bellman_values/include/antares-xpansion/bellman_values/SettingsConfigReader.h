@@ -1,13 +1,8 @@
 #pragma once
 #include <filesystem>
-#include <iostream>
-#include <map>
-#include <optional>
 #include <string>
-#include <variant>
 
-#include "ConfigReader.h"
-#include "yaml-cpp/yaml.h"
+#include "antares-xpansion/config_reader/ConfigReader.h"
 
 class SettingsConfigReader: ConfigReader
 {
