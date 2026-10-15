@@ -1,22 +1,345 @@
-
-
 #include "antares-xpansion/lpnamer/main/Balancing.h"
 
-#include <iostream>
-#include <numeric>
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <chrono>
+#include <fstream>
+#include <map>
+#include <ranges>
+#include <set>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <string_view>
 #include <tbb/parallel_for_each.h>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include <antares/api/solver.h>
 #include <antares/solver/lps/LpsFromAntares.h>
 
 #include "antares-xpansion/balancing/utils.h"
 
-/// @brief Launch the simulation and save the problems
-/// @param directories The directories to use for the problems generation
-/// @param areas The area investments to use for the problems modification
-/// @param logger The logger to use
-/// @param solverName The name of the solver to use
+namespace
+{
+constexpr const char* ITERATIONS_LOG_FILE = "iterations_values_log.csv";
+constexpr const char* FINAL_CRITERIA_FILE = "final_criteria.csv";
+constexpr const char* FINAL_CAPACITIES_FILE = "final_capacities.csv";
+constexpr const char* WHITESPACES = " \t\n\r\f\v";
+
+// An increment never goes below 10% of its initial value, and shrinks by 10% each time the
+// criterion state changes
+constexpr double INCREMENT_REDUCTION_RATIO = 0.1;
+
+// ---------------------------------------------------------------------------
+// Iteration over candidates
+// ---------------------------------------------------------------------------
+
+template<typename AreaT, typename Func>
+void forEachCandidateOnArea(AreaT& area, Func&& f)
+{
+    for (auto& [candidateName, candidate]: area.investmentCandidates)
+    {
+        f(candidateName, candidate);
+    }
+    for (auto& [candidateName, candidate]: area.decommissioningCandidates)
+    {
+        f(candidateName, candidate);
+    }
+}
+
+// Calls f(areaName, candidateName, candidate) on every candidate of every area
+template<typename AreasT, typename Func>
+void forEachCandidate(AreasT& areas, Func&& f)
+{
+    for (auto& [areaName, area]: areas)
+    {
+        forEachCandidateOnArea(area,
+                               [&](const std::string& candidateName, auto& candidate)
+                               { f(areaName, candidateName, candidate); });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dispatchable production variables
+// ---------------------------------------------------------------------------
+
+std::string toLower(std::string_view text)
+{
+    std::string lower(text);
+    std::ranges::transform(lower,
+                           lower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lower;
+}
+
+void trimTrailingWhitespaces(std::string& text)
+{
+    text.erase(text.find_last_not_of(WHITESPACES) + 1);
+}
+
+std::unordered_map<std::string, size_t> buildVarToIndex(const std::vector<std::string>& vars)
+{
+    std::unordered_map<std::string, size_t> varToIndex;
+    varToIndex.reserve(vars.size());
+    for (size_t i = 0; i < vars.size(); ++i)
+    {
+        varToIndex.emplace(toLower(vars[i]), i);
+    }
+    return varToIndex;
+}
+
+std::string dispatchableProductionVarName(const std::string& areaName,
+                                          const std::string& candidateName,
+                                          size_t hour)
+{
+    return "dispatchableproduction::area<" + areaName + ">::thermalcluster<" + candidateName
+           + ">::hour<" + std::to_string(hour) + ">";
+}
+
+template<typename T>
+void setDispProdVarIndicesAndMarginalCost(const std::string& areaName,
+                                          const std::string& candidateName,
+                                          Candidate<T>& candidate,
+                                          const std::unordered_map<std::string, size_t>& varToIndex,
+                                          const std::vector<double>& objCoeffs)
+{
+    for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+    {
+        const auto it = varToIndex.find(
+          dispatchableProductionVarName(areaName, candidateName, hour));
+        if (it == varToIndex.end())
+        {
+            throw std::runtime_error("Failed to find for candidate " + candidateName + " of area "
+                                     + areaName + " the dispProdVarIndices of hour "
+                                     + std::to_string(hour));
+        }
+        candidate.dispProdVarIndices[hour] = it->second;
+        if (hour == 0)
+        {
+            candidate.marginalCost = objCoeffs[it->second];
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Capacity actions
+// ---------------------------------------------------------------------------
+
+bool isInvestmentAction(CapacityAction action)
+{
+    return action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT;
+}
+
+bool isActionPossible(const Area& area, CapacityAction action)
+{
+    switch (action)
+    {
+    case CapacityAction::INVESTMENT:
+        return area.isInvestmentPossible();
+    case CapacityAction::DISINVESTMENT:
+        return area.isDisinvestmentPossible();
+    case CapacityAction::DECOMMISSIONING:
+        return area.isDecommissioningPossible();
+    case CapacityAction::RECOMMISSIONING:
+        return area.isRecommissioningPossible();
+    }
+    return false;
+}
+
+bool isInvestmentCycle(const Area& area)
+{
+    if (!area.lastAction.has_value())
+    {
+        return area.criterionState == CriterionState::HIGHER;
+    }
+    return isInvestmentAction(area.lastAction.value());
+}
+
+std::array<CapacityAction, 2> filterActions(bool investmentCycle, bool criterionIsHigher)
+{
+    if (investmentCycle)
+    {
+        if (criterionIsHigher)
+        {
+            return {CapacityAction::INVESTMENT, CapacityAction::RECOMMISSIONING};
+        }
+        return {CapacityAction::DISINVESTMENT, CapacityAction::DECOMMISSIONING};
+    }
+    if (criterionIsHigher)
+    {
+        return {CapacityAction::RECOMMISSIONING, CapacityAction::INVESTMENT};
+    }
+    return {CapacityAction::DECOMMISSIONING, CapacityAction::DISINVESTMENT};
+}
+
+// ---------------------------------------------------------------------------
+// Increment Cost
+// ---------------------------------------------------------------------------
+
+bool shouldReduceIncrements(const Area& area)
+{
+    return area.oldCriterionState != area.criterionState
+           && area.oldCriterionState != CriterionState::UNINITIALIZED
+           && area.criterionState != CriterionState::VALID;
+}
+
+double reducedIncrement(double currentIncrement, double initialIncrement)
+{
+    return std::max(initialIncrement * INCREMENT_REDUCTION_RATIO,
+                    currentIncrement - INCREMENT_REDUCTION_RATIO * initialIncrement);
+}
+
+// ---------------------------------------------------------------------------
+// Criteria
+// ---------------------------------------------------------------------------
+
+std::map<std::string, double> computeAverageAreaCriteriaValues(const SimuValues& simuValues)
+{
+    std::set<unsigned int> years;
+    std::map<std::string, double> averageCriteria;
+
+    for (const auto& [id, output]: simuValues)
+    {
+        years.insert(id.year);
+        for (const auto& [area, value]: output.areaCriterionValues)
+        {
+            averageCriteria[area] += value;
+        }
+    }
+
+    const double numYears = static_cast<double>(years.size());
+    for (auto& sum: averageCriteria | std::views::values)
+    {
+        sum /= numYears;
+    }
+    return averageCriteria;
+}
+
+// ---------------------------------------------------------------------------
+// Problem bounds
+// ---------------------------------------------------------------------------
+
+// Bounds to change for each candidate in a problem
+struct CandidatesBoundsChange
+{
+    std::vector<int> varIndices;
+    std::vector<char> boundTypes;
+    std::vector<double> values;
+
+    explicit CandidatesBoundsChange(size_t nbCandidates)
+    {
+        const size_t size = nbCandidates * 2 * NUMBER_OF_HOURS_PER_WEEK;
+        varIndices.reserve(size);
+        boundTypes.reserve(size);
+        values.reserve(size);
+    }
+
+    template<typename T>
+    void addBoundsChange(const Candidate<T>& candidate, Antares::Solver::WeeklyProblemId pbId)
+    {
+        const auto& hourlyBounds = candidate.boundsData.at(pbId);
+        std::array<double, NUMBER_OF_HOURS_PER_WEEK> upperBounds;
+        std::array<double, NUMBER_OF_HOURS_PER_WEEK> lowerBounds;
+        for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+        {
+            const int index = static_cast<int>(candidate.dispProdVarIndices[hour]);
+            // add upper candidate bounds change
+            double upperBoundValue = hourlyBounds[hour].upBoundRatioToInstalledCap
+                                     * candidate.installedCapacity;
+            appendBoundsChange('U', index, upperBoundValue);
+            // add lower candidate bounds change
+            double lowerBoundValue = upperBoundValue * hourlyBounds[hour].lowBoundRatioToUpBound;
+            appendBoundsChange('L', index, lowerBoundValue);
+        }
+    }
+
+private:
+    void appendBoundsChange(char boundType, int index, double value)
+    {
+        boundTypes.push_back(boundType);
+        varIndices.push_back(index);
+        values.push_back(value);
+    }
+};
+
+// ---------------------------------------------------------------------------
+// Output
+// ---------------------------------------------------------------------------
+
+std::ofstream openForWriting(const std::filesystem::path& path,
+                             std::ios_base::openmode mode = std::ios_base::out)
+{
+    std::ofstream file(path, mode);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Failed to open file for writing: " + path.string());
+    }
+    return file;
+}
+
+template<typename CandidateMap>
+void describeCandidates(std::ostream& out, std::string_view label, const CandidateMap& candidates)
+{
+    for (const auto& [candidateName, candidate]: candidates)
+    {
+        out << "  " << label << " capacity for cluster candidate " << candidateName << ": "
+            << candidate.installedCapacity << " | oscillation : " << candidate.oscillationCounter
+            << "\n";
+    }
+}
+
+template<typename T>
+void writeCapacityChange(std::ostream& file,
+                         int iteration,
+                         const std::string& areaName,
+                         const Area& area,
+                         const std::string& candidateName,
+                         Candidate<T>& candidate)
+{
+    if (candidate.installedCapacity != candidate.previousInstalledCapacity)
+    {
+        std::string_view lastAction = area.lastAction.has_value()
+                                        ? to_string(area.lastAction.value())
+                                        : "NOACTION";
+        file << iteration << "," << areaName << "," << to_string(area.criterionState) << ","
+             << lastAction << "," << candidateName << ","
+             << candidate.installedCapacity - candidate.previousInstalledCapacity << "\n";
+    }
+    candidate.previousInstalledCapacity = candidate.installedCapacity;
+}
+
+double totalCapacityChange(const Area& area)
+{
+    double total = 0.0;
+    forEachCandidateOnArea(area,
+                           [&total](const std::string&, const auto& candidate) {
+                               total += candidate.installedCapacity
+                                        - candidate.initInstalledCapacity;
+                           });
+    return total;
+}
+
+std::string_view criteriaStatus(const Area& area)
+{
+    if (area.avgCriteria < area.lowerThreshold())
+    {
+        return "LOWER";
+    }
+    if (area.avgCriteria > area.higherThreshold())
+    {
+        return "HIGHER";
+    }
+    return "NO ACTION";
+}
+} // namespace
+
+// ---------------------------------------------------------------------------
+// Construction and initial setup
+// ---------------------------------------------------------------------------
+
 Balancing::Balancing(ConfigurationManager::ConfigDirectories directories,
                      std::map<std::string, Area> areas,
                      Logger logger,
@@ -24,150 +347,36 @@ Balancing::Balancing(ConfigurationManager::ConfigDirectories directories,
     ProblemGenerationOptimSimu(directories, logger, problemManager),
     areas(std::move(areas))
 {
-    logger->display_message("Get candidates indices and marginal cost",
-                            LogUtils::LOGLEVEL::INFO,
-                            PROBLEM_GENERATION_LOGGER_CONTEXT);
+    logMessage("Get candidates indices and marginal cost");
     fillDispProdVarIndicesAndMarginalCosts();
-    logger->display_message("Get candidate bounds data",
-                            LogUtils::LOGLEVEL::INFO,
-                            PROBLEM_GENERATION_LOGGER_CONTEXT);
+    logMessage("Get candidate bounds data");
     setCapacitiesDataForCandidates();
 }
 
-// Calls f(candidate) on every investment and decommissioning candidate of every area
-template<typename Func>
-static void forEachCandidate(std::map<std::string, Area>& areas, Func&& f)
-{
-    for (auto& [areaName, area]: areas)
-    {
-        for (auto& [candidateName, candidate]: area.investmentCandidates)
-        {
-            f(candidate);
-        }
-        for (auto& [candidateName, candidate]: area.decommissioningCandidates)
-        {
-            f(candidate);
-        }
-    }
-}
-
-static std::unordered_map<std::string, size_t> buildVarToIndex(const std::vector<std::string>& vars)
-{
-    std::unordered_map<std::string, size_t> index;
-    index.reserve(vars.size());
-    for (size_t i = 0; i < vars.size(); ++i)
-    {
-        // convert the source string to lower case
-        std::string lowerString;
-        lowerString.resize(vars[i].size());
-        std::transform(vars[i].begin(),
-                       vars[i].end(),
-                       lowerString.begin(),
-                       [](unsigned char c) { return char(std::tolower(c)); });
-        // add pair
-        index.emplace(lowerString, i);
-    }
-    return index;
-}
-
-/// @brief Fill the DispatchableProduction variable indices and marginal cost for a given area
-/// @param areaName The name of the area to process
-/// @param candidateName The name of the cluster candidate to process
-/// @param varToIndex A map from variable names to their indices
-/// @param objCoeffs The objective coefficients for each variable
-template<typename T>
-void Balancing::fillDispProdVarIndicesAndMarginalCostsForArea(
-  const std::string& areaName,
-  const std::string& candidateName,
-  Candidate<T>& candidate,
-  const std::unordered_map<std::string, size_t>& varToIndex,
-  const std::vector<double>& objCoeffs)
-{
-    for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
-    {
-        const std::string varName = "dispatchableproduction::area<" + areaName
-                                    + ">::thermalcluster<" + candidateName + ">::hour<"
-                                    + std::to_string(hour) + ">";
-
-        const auto it = varToIndex.find(varName);
-        if (it != varToIndex.end())
-        {
-            candidate.dispProdVarIndices[hour] = it->second;
-
-            if (hour == 0)
-            {
-                candidate.marginalCost = objCoeffs[it->second];
-            }
-        }
-        else
-        {
-            throw std::runtime_error("Failed to find for candidate " + candidateName + " of area "
-                                     + areaName + " the dispProdVarIndices of hour "
-                                     + std::to_string(hour));
-        }
-    }
-}
-
-/// @brief Update the problems for the balancing calculation
 void Balancing::fillDispProdVarIndicesAndMarginalCosts()
 {
     const auto& firstProblem = problemManager->getFirstProblem();
     auto vars = firstProblem->get_col_names();
-    for (auto& s: vars)
+    for (auto& var: vars)
     {
-        s.erase(s.find_last_not_of(" \t\n\r\f\v") + 1); // remove whitespaces
+        trimTrailingWhitespaces(var);
     }
 
-    size_t nbVars = vars.size();
-    std::vector<double> objCoeffs(nbVars);
-    firstProblem->get_obj(objCoeffs.data(), 0, nbVars - 1);
+    std::vector<double> objCoeffs(vars.size());
+    firstProblem->get_obj(objCoeffs.data(), 0, static_cast<int>(vars.size()) - 1);
 
     const auto varToIndex = buildVarToIndex(vars);
-
-    for (auto& [areaName, area]: areas)
-    {
-        for (auto& [candidateName, candidate]: area.investmentCandidates)
-        {
-            fillDispProdVarIndicesAndMarginalCostsForArea(areaName,
-                                                          candidateName,
-                                                          candidate,
-                                                          varToIndex,
-                                                          objCoeffs);
-        }
-        for (auto& [candidateName, candidate]: area.decommissioningCandidates)
-        {
-            fillDispProdVarIndicesAndMarginalCostsForArea(areaName,
-                                                          candidateName,
-                                                          candidate,
-                                                          varToIndex,
-                                                          objCoeffs);
-        }
-    }
-}
-
-void Balancing::prepareCandidatesBoundsData(const std::set<Antares::Solver::WeeklyProblemId>& pbIds)
-{
-    forEachCandidate(areas, [&](CandidateBase& c) { c.prepareBoundsData(pbIds); });
-}
-
-// Parallel: each task writes only to boundsData[pbId]
-void Balancing::computeCandidatesBoundsData(const std::set<Antares::Solver::WeeklyProblemId>& pbIds)
-{
-    tbb::parallel_for_each(pbIds,
-                           [&](const auto& pbId)
-                           {
-                               const auto problem = problemManager->getProblemFromId(pbId);
-                               forEachCandidate(areas,
-                                                [&](CandidateBase& c) {
-                                                    c.computeAndSetOneWeekCapacityData(pbId,
-                                                                                       problem);
-                                                });
-                           });
-}
-
-void Balancing::updateCandidatesCapacities()
-{
-    forEachCandidate(areas, [](CandidateBase& c) { c.updateCapacitiesFromBounds(); });
+    forEachCandidate(areas,
+                     [&](const std::string& areaName,
+                         const std::string& candidateName,
+                         auto& candidate)
+                     {
+                         setDispProdVarIndicesAndMarginalCost(areaName,
+                                                              candidateName,
+                                                              candidate,
+                                                              varToIndex,
+                                                              objCoeffs);
+                     });
 }
 
 void Balancing::setCapacitiesDataForCandidates()
@@ -178,133 +387,154 @@ void Balancing::setCapacitiesDataForCandidates()
     updateCandidatesCapacities();
 }
 
-/// @brief Find the action to apply from the criterion states and area investment parameters
-/// @param areaName The name of the area
-/// @param currentState The current criterion state
-/// @param area The area investment parameters
-/// @return The action to apply
+void Balancing::prepareCandidatesBoundsData(const std::set<Antares::Solver::WeeklyProblemId>& pbIds)
+{
+    forEachCandidate(areas,
+                     [&](const std::string&, const std::string&, CandidateBase& c)
+                     { c.prepareBoundsData(pbIds); });
+}
+
+void Balancing::computeCandidatesBoundsData(const std::set<Antares::Solver::WeeklyProblemId>& pbIds)
+{
+    tbb::parallel_for_each(pbIds,
+                           [&](const auto& pbId)
+                           {
+                               const auto problem = problemManager->getProblemFromId(pbId);
+                               forEachCandidate(
+                                 areas,
+                                 [&](const std::string&, const std::string&, CandidateBase& c)
+                                 { c.computeAndSetOneWeekCapacityData(pbId, problem); });
+                           });
+}
+
+void Balancing::updateCandidatesCapacities()
+{
+    forEachCandidate(areas,
+                     [](const std::string&, const std::string&, CandidateBase& c)
+                     { c.updateCapacitiesFromBounds(); });
+}
+
+// ---------------------------------------------------------------------------
+// Candidates access
+// ---------------------------------------------------------------------------
+
+Candidate<InvestmentCandidateType>& Balancing::getInvestmentCandidate(
+  const std::string& areaName,
+  const std::string& candidateName)
+{
+    return areas.at(areaName).getInvestmentCandidate(candidateName);
+}
+
+Candidate<DecommissioningCandidateType>& Balancing::getDecommissioningCandidate(
+  const std::string& areaName,
+  const std::string& candidateName)
+{
+    return areas.at(areaName).getDecommissioningCandidate(candidateName);
+}
+
+double Balancing::getCandidateCurrentCapacity(CapacityAction action,
+                                              const AreaCandidate& areaCandidate)
+{
+    auto& area = areas.at(areaCandidate.first);
+    return isInvestmentAction(action)
+             ? area.getInvestmentCandidate(areaCandidate.second).installedCapacity
+             : area.getDecommissioningCandidate(areaCandidate.second).installedCapacity;
+}
+
+// ---------------------------------------------------------------------------
+// Criterion state
+// ---------------------------------------------------------------------------
+
+bool Balancing::isBalanced() const
+{
+    return std::ranges::all_of(areas | std::views::values,
+                               [](const Area& area)
+                               { return area.criterionState == CriterionState::VALID; });
+}
+
+CriterionState Balancing::computeCriterionState(const Area& area, double value) const
+{
+    if (value < area.lowerThreshold())
+    {
+        return CriterionState::LOWER;
+    }
+    if (value > area.higherThreshold())
+    {
+        return CriterionState::HIGHER;
+    }
+    return CriterionState::VALID;
+}
+
+void Balancing::updateAreaCriteriaData(const SimuValues& simuValues)
+{
+    const auto averageCriteria = computeAverageAreaCriteriaValues(simuValues);
+    for (auto& [areaName, area]: areas)
+    {
+        const double average = averageCriteria.at(areaName);
+        area.avgCriteria = average;
+        area.criterionState = computeCriterionState(area, average);
+    }
+}
+
+void Balancing::updateAreasIncrement()
+{
+    for (auto& area: areas | std::views::values)
+    {
+        if (shouldReduceIncrements(area))
+        {
+            area.currentInvestmentIncrement = reducedIncrement(area.currentInvestmentIncrement,
+                                                               area.investmentIncrement);
+            area.currentDecommissioningIncrement = reducedIncrement(
+              area.currentDecommissioningIncrement,
+              area.decommissioningIncrement);
+        }
+    }
+}
+
+void Balancing::updateOldCriterionState()
+{
+    for (auto& area: areas | std::views::values)
+    {
+        area.oldCriterionState = area.criterionState;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Choosing and applying actions on candidates
+// ---------------------------------------------------------------------------
+
 std::optional<CapacityAction> Balancing::determineCapacityAction(const Area& area) const
 {
-    std::optional<CapacityAction> lastAction = area.lastAction;
-    CriterionState currentState = area.criterionState;
-    const bool isHigher = currentState == CriterionState::HIGHER;
-    // Investment cycle if the previous action was investment or disinvestment, or if it's the
-    // first iteration and the criterion is higher than the target
-    const bool isInvestmentCycle = !lastAction.has_value()
-                                     ? isHigher
-                                     : lastAction.value() == CapacityAction::INVESTMENT
-                                         || lastAction.value() == CapacityAction::DISINVESTMENT;
-
     if (area.maxOscillationReached())
     {
-        // if no action is possible: logging a warning and carrying on
         std::ostringstream oss;
         oss << "No action in area " << area.name << " because max oscillation has been reached";
-        logger->display_message(oss.str(),
-                                LogUtils::LOGLEVEL::INFO,
-                                PROBLEM_GENERATION_LOGGER_CONTEXT);
+        logMessage(oss.str());
         return std::nullopt;
     }
 
-    if (isInvestmentCycle && isHigher)
+    const bool criterionIsHigher = area.criterionState == CriterionState::HIGHER;
+    for (const CapacityAction action: filterActions(isInvestmentCycle(area), criterionIsHigher))
     {
-        if (area.isInvestmentPossible())
+        if (isActionPossible(area, action))
         {
-            return CapacityAction::INVESTMENT;
-        }
-        if (area.isRecommissioningPossible())
-        {
-            return CapacityAction::RECOMMISSIONING;
-        }
-    }
-    else if (isInvestmentCycle && !isHigher)
-    {
-        if (area.isDisinvestmentPossible())
-        {
-            return CapacityAction::DISINVESTMENT;
-        }
-        if (area.isDecommissioningPossible())
-        {
-            return CapacityAction::DECOMMISSIONING;
-        }
-    }
-    else if (isHigher)
-    {
-        if (area.isRecommissioningPossible())
-        {
-            return CapacityAction::RECOMMISSIONING;
-        }
-        if (area.isInvestmentPossible())
-        {
-            return CapacityAction::INVESTMENT;
-        }
-    }
-    else
-    {
-        if (area.isDecommissioningPossible())
-        {
-            return CapacityAction::DECOMMISSIONING;
-        }
-        if (area.isDisinvestmentPossible())
-        {
-            return CapacityAction::DISINVESTMENT;
+            return action;
         }
     }
 
     // if no action is possible: logging a warning and carrying on
     std::ostringstream oss;
     oss << "Area " << area.name << " is not balanced but no modification is possible\n"
-        << " Current criterion state: " << to_string(currentState) << "\n"
+        << " Current criterion state: " << to_string(area.criterionState) << "\n"
         << " Previous action: "
         << (area.lastAction.has_value() ? to_string(area.lastAction.value()) : "None") << "\n";
-    logger->display_message(oss.str(),
-                            LogUtils::LOGLEVEL::WARNING,
-                            PROBLEM_GENERATION_LOGGER_CONTEXT);
+    logMessage(oss.str(), LogUtils::LOGLEVEL::WARNING);
     return std::nullopt;
 }
 
-/// @brief Update the the area investment increments based on the criterion states
-/// @param areaCritData The criterion data containing states to use for the update
-void Balancing::updateAreasIncrement()
+AreaActions Balancing::findAreaCandidatesToModify(const SimuValues& simuValues)
 {
-    for (auto& [areaName, area]: areas)
-    {
-        if (area.oldCriterionState != area.criterionState
-            && area.oldCriterionState != CriterionState::UNINITIALIZED
-            && area.criterionState != CriterionState::VALID)
-        {
-            area.currentInvestmentIncrement = std::max(area.investmentIncrement * 0.1,
-                                                       area.currentInvestmentIncrement
-                                                         - 0.1 * area.investmentIncrement);
-            area.currentDecommissioningIncrement = std::max(area.decommissioningIncrement * 0.1,
-                                                            area.currentDecommissioningIncrement
-                                                              - 0.1
-                                                                  * area.decommissioningIncrement);
-        }
-    }
-}
-
-/// @brief Update the old criterion states with the current ones
-/// @param areaCritState The current criterion states to set as old criterion states
-void Balancing::updateOldCriterionState()
-{
-    for (auto& [areaName, area]: areas)
-    {
-        area.oldCriterionState = area.criterionState;
-    }
-}
-
-/// @brief Find the action to apply for each area candidates
-/// @param simuValues The simulation values to use for the problems modification
-/// @return A map associating selected area candidate to their action
-std::map<AreaCandidate, CapacityAction> Balancing::findAreaCandidatesToModify(
-  const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues)
-{
-    logger->display_message("Find areas candidate to modify",
-                            LogUtils::LOGLEVEL::INFO,
-                            PROBLEM_GENERATION_LOGGER_CONTEXT);
-    std::map<AreaCandidate, CapacityAction> areaCandidatesToModify;
-    // reset Action on the areas
+    logMessage("Find areas candidate to modify");
     areasAction.clear();
     updateAreasIncrement();
 
@@ -314,100 +544,35 @@ std::map<AreaCandidate, CapacityAction> Balancing::findAreaCandidatesToModify(
         {
             continue;
         }
-        std::optional<CapacityAction> action = determineCapacityAction(area);
-        // if no action possible, no candidate will be modified
-        if (action.has_value())
+        // if no action is possible, no candidate will be modified
+        if (const auto action = determineCapacityAction(area))
         {
             areasAction[areaName] = action.value();
-            const bool isInvestmentAction = action == CapacityAction::INVESTMENT
-                                            || action == CapacityAction::DISINVESTMENT;
             area.initializeRentability(action.value());
         }
     }
 
     for (const auto& [pbId, pbOutput]: simuValues)
     {
-        std::vector<double> solution = problemManager->getProblemSolution(pbId);
-
+        const std::vector<double> solution = problemManager->getProblemSolution(pbId);
         for (const auto& [areaName, action]: areasAction)
         {
             areas.at(areaName).updateRentabilityWithProblem(action, pbOutput, solution);
         }
     }
 
+    AreaActions areaCandidatesToModify;
     for (const auto& [areaName, action]: areasAction)
     {
-        std::string candidateName = areas.at(areaName).selectCandidateWithBestRentability(action);
+        const std::string candidateName = areas.at(areaName).selectCandidateWithBestRentability(
+          action);
         areaCandidatesToModify[{areaName, candidateName}] = action;
     }
+
     updateOldCriterionState();
     return areaCandidatesToModify;
 }
 
-/// @brief Compute the criterion state from the area investment parameters and the criterion
-/// value
-/// @param area The area investment parameters to use for the computation
-/// @param value The criterion value to use for the computation
-/// @return The criterion state computed
-CriterionState Balancing::computeCriterionState(const Area& area, double value) const
-{
-    if (value < lowerThreshold(area))
-    {
-        return CriterionState::LOWER;
-    }
-    else if (value > higherThreshold(area))
-    {
-        return CriterionState::HIGHER;
-    }
-    else
-    {
-        return CriterionState::VALID;
-    }
-}
-
-/// @brief Compute the average area criteria values from the simulation values
-/// @param simuValues The simulation values to compute the average from
-/// @return The average area criteria values
-std::map<std::string, double> computeAverageAreaCriteriaValues(
-  const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues)
-{
-    std::set<unsigned int> years;
-    std::map<std::string, double> areasAvgCriteria;
-
-    for (const auto& [id, output]: simuValues)
-    {
-        years.insert(id.year);
-        for (const auto& [area, value]: output.areaCriterionValues)
-        {
-            areasAvgCriteria[area] += value;
-        }
-    }
-
-    const double numYears = static_cast<double>(years.size());
-    for (auto& sum: areasAvgCriteria | std::views::values)
-    {
-        sum /= numYears;
-    }
-
-    return areasAvgCriteria;
-}
-
-/// @brief Update current area criteria data
-void Balancing::updateAreaCriteriaData(
-  const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues)
-{
-    const auto areasAvgCriteria = computeAverageAreaCriteriaValues(simuValues);
-    for (auto& [areaName, area]: areas)
-    {
-        area.avgCriteria = areasAvgCriteria.at(areaName);
-        area.criterionState = computeCriterionState(area, areasAvgCriteria.at(areaName));
-    };
-}
-
-/// @brief Compute the new candidate's installed capacity
-/// @param action The action to apply
-/// @param area The area investment data to update
-/// @param candidateName The name of the cluster candidate to update
 void Balancing::computeCandidateInstalledCapacity(CapacityAction action,
                                                   Area& area,
                                                   const std::string& candidateName)
@@ -428,7 +593,6 @@ void Balancing::computeCandidateInstalledCapacity(CapacityAction action,
         candidate.installedCapacity = std::max(candidate.installedCapacity
                                                  - area.currentInvestmentIncrement,
                                                candidate.initInstalledCapacity);
-
         break;
     }
     case CapacityAction::DECOMMISSIONING:
@@ -450,316 +614,119 @@ void Balancing::computeCandidateInstalledCapacity(CapacityAction action,
     }
 }
 
-void Balancing::initializeCandidatesToModify(
-  std::map<AreaCandidate, CapacityAction>& areaCandidatesToModify)
+void Balancing::initializeCandidatesToModify(const AreaActions& areaCandidatesToModify)
 {
     for (const auto& [areaCandidate, action]: areaCandidatesToModify)
     {
         auto& area = areas.at(areaCandidate.first);
+        const auto& candidateName = areaCandidate.second;
+
         area.lastAction = action;
-        computeCandidateInstalledCapacity(action, area, areaCandidate.second);
-        if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
+        computeCandidateInstalledCapacity(action, area, candidateName);
+        if (isInvestmentAction(action))
         {
-            auto candidate = area.getInvestmentCandidate(areaCandidate.second);
-            candidate.updateOscillationStatus(action);
+            area.getInvestmentCandidate(candidateName).updateOscillationStatus(action);
         }
         else
         {
-            auto candidate = area.getDecommissioningCandidate(areaCandidate.second);
-            candidate.updateOscillationStatus(action);
+            area.getDecommissioningCandidate(candidateName).updateOscillationStatus(action);
         }
     }
 }
 
-/// @brief Apply the action for each area candidate to a problem
-/// @param pbId The problem Id
-/// @param problem The problem
-/// @param action The action to apply
-void Balancing::applyActionToCandidate(
-  Antares::Solver::WeeklyProblemId pbId,
-  std::shared_ptr<Problem>& problem,
-  std::map<AreaCandidate, CapacityAction> areaCandidatesToModify)
+void Balancing::applyCapacityActions(const AreaActions& areaCandidatesToModify)
 {
-    std::vector<char> vecUpperChar(NUMBER_OF_HOURS_PER_WEEK, 'U');
-    std::vector<char> vecLowerChar(NUMBER_OF_HOURS_PER_WEEK, 'L');
-    std::vector<int> vecIndices(NUMBER_OF_HOURS_PER_WEEK * areaCandidatesToModify.size() * 2);
-    std::vector<double> vecBoundsValue(NUMBER_OF_HOURS_PER_WEEK * areaCandidatesToModify.size()
-                                       * 2);
+    if (areaCandidatesToModify.empty())
+    {
+        return;
+    }
+    logMessage("Apply action");
 
-    std::vector<char> vecBoundsChar(NUMBER_OF_HOURS_PER_WEEK * areaCandidatesToModify.size() * 2);
-
-    int idx = 0;
+    std::map<AreaCandidate, double> previousCapacities;
     for (const auto& [areaCandidate, action]: areaCandidatesToModify)
     {
-        std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> varIndices;
-        std::vector<BoundData> oneWeekBoundsDataCandidate;
+        previousCapacities[areaCandidate] = getCandidateCurrentCapacity(action, areaCandidate);
+    }
+
+    initializeCandidatesToModify(areaCandidatesToModify);
+
+    for (const auto& [areaCandidate, action]: areaCandidatesToModify)
+    {
+        logMessage(describeAction(areaCandidate, action, previousCapacities.at(areaCandidate)));
+    }
+}
+
+void Balancing::applyActionToCandidate(Antares::Solver::WeeklyProblemId pbId,
+                                       const std::shared_ptr<Problem>& problem,
+                                       const AreaActions& areaCandidatesToModify)
+{
+    CandidatesBoundsChange cBoundsChange(areaCandidatesToModify.size());
+    for (const auto& [areaCandidate, action]: areaCandidatesToModify)
+    {
         auto& area = areas.at(areaCandidate.first);
-        area.lastAction = action;
-        double installedCapacity;
-        if (action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT)
+        const auto& candidateName = areaCandidate.second;
+        if (isInvestmentAction(action))
         {
-            auto candidate = area.getInvestmentCandidate(areaCandidate.second);
-            installedCapacity = candidate.installedCapacity;
-            varIndices = candidate.dispProdVarIndices;
-            oneWeekBoundsDataCandidate = area.getInvestmentCandidate(areaCandidate.second)
-                                           .boundsData[pbId];
+            cBoundsChange.addBoundsChange(area.getInvestmentCandidate(candidateName), pbId);
         }
         else
         {
-            auto candidate = area.getDecommissioningCandidate(areaCandidate.second);
-            installedCapacity = candidate.installedCapacity;
-            varIndices = candidate.dispProdVarIndices;
-            oneWeekBoundsDataCandidate = area.getDecommissioningCandidate(areaCandidate.second)
-                                           .boundsData[pbId];
+            cBoundsChange.addBoundsChange(area.getDecommissioningCandidate(candidateName), pbId);
         }
-        std::vector<double> subUpperBoundsValue(NUMBER_OF_HOURS_PER_WEEK);
-        std::vector<double> subLowerBoundsValue(NUMBER_OF_HOURS_PER_WEEK);
-        for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
-        {
-            double upperValue = oneWeekBoundsDataCandidate[hour].upBoundRatioToInstalledCap
-                                * installedCapacity;
-            subUpperBoundsValue[hour] = upperValue;
-            subLowerBoundsValue[hour] = oneWeekBoundsDataCandidate[hour].lowBoundRatioToUpBound
-                                        * upperValue;
-        }
-
-        std::copy(varIndices.begin(),
-                  varIndices.end(),
-                  vecIndices.begin() + idx * NUMBER_OF_HOURS_PER_WEEK);
-        std::copy(varIndices.begin(),
-                  varIndices.end(),
-                  vecIndices.begin() + (idx + 1) * NUMBER_OF_HOURS_PER_WEEK);
-
-        std::copy(vecUpperChar.begin(),
-                  vecUpperChar.end(),
-                  vecBoundsChar.begin() + idx * NUMBER_OF_HOURS_PER_WEEK);
-        std::copy(vecLowerChar.begin(),
-                  vecLowerChar.end(),
-                  vecBoundsChar.begin() + (idx + 1) * NUMBER_OF_HOURS_PER_WEEK);
-
-        std::copy(subUpperBoundsValue.begin(),
-                  subUpperBoundsValue.end(),
-                  vecBoundsValue.begin() + idx * NUMBER_OF_HOURS_PER_WEEK);
-        std::copy(subLowerBoundsValue.begin(),
-                  subLowerBoundsValue.end(),
-                  vecBoundsValue.begin() + (idx + 1) * NUMBER_OF_HOURS_PER_WEEK);
-        idx += 2;
     }
-    problem->chg_bounds(vecIndices, vecBoundsChar, vecBoundsValue);
+    problem->chg_bounds(cBoundsChange.varIndices, cBoundsChange.boundTypes, cBoundsChange.values);
     problemManager->setProblem(pbId, problem);
 }
 
-double Balancing::getCandidateCurrentCapacity(const CapacityAction& action,
-                                              const AreaCandidate& areaCandidate)
+SimuValues Balancing::solveAndComputeCriterionAndPrice(const AreaActions& areaCandidatesToModify,
+                                                       GreedyBalancingFinder& gbf)
 {
-    double candidateCurrentCapacity;
-    switch (action)
-    {
-    case CapacityAction::INVESTMENT:
-    case CapacityAction::DISINVESTMENT:
-        candidateCurrentCapacity = areas.at(areaCandidate.first)
-                                     .getInvestmentCandidate(areaCandidate.second)
-                                     .installedCapacity;
-        break;
-    case CapacityAction::DECOMMISSIONING:
-    case CapacityAction::RECOMMISSIONING:
-        candidateCurrentCapacity = areas.at(areaCandidate.first)
-                                     .getDecommissioningCandidate(areaCandidate.second)
-                                     .installedCapacity;
-        break;
-    }
-    return candidateCurrentCapacity;
+    tbb::parallel_for_each(problemManager->getProblemIds(),
+                           [&](const auto& pbId)
+                           {
+                               std::shared_ptr<Problem> problem = problemManager->getProblemFromId(
+                                 pbId);
+                               if (!areaCandidatesToModify.empty())
+                               {
+                                   applyActionToCandidate(pbId, problem, areaCandidatesToModify);
+                               }
+                               gbf.computeCriterionAndPrice(pbId, problem);
+                           });
+    return gbf.getBalancingResults();
 }
 
-/// @brief Check if the system is balanced from the simulation values
-/// @param simuValues The simulation values to use for the computation
-/// @return true if the system is balanced, false otherwise
-bool Balancing::isBalanced() const
+// ---------------------------------------------------------------------------
+// Logging and CSV output
+// ---------------------------------------------------------------------------
+
+void Balancing::logMessage(const std::string& message, LogUtils::LOGLEVEL level) const
 {
-    return std::ranges::all_of(areas | std::views::values,
-                               [](const Area& area)
-                               { return area.criterionState == CriterionState::VALID; });
+    logger->display_message(message, level, PROBLEM_GENERATION_LOGGER_CONTEXT);
 }
 
-Candidate<InvestmentCandidateType>& Balancing::getInvestmentCandidate(
-  const std::string& areaName,
-  const std::string& candidateName)
+void Balancing::logAreasView() const
 {
-    return areas.at(areaName).getInvestmentCandidate(candidateName);
-}
-
-Candidate<DecommissioningCandidateType>& Balancing::getDecommissioningCandidate(
-  const std::string& areaName,
-  const std::string& candidateName)
-{
-    return areas.at(areaName).getDecommissioningCandidate(candidateName);
-}
-
-void Balancing::logAreasView(
-  const std::map<Antares::Solver::WeeklyProblemId, PbOutput>& simuValues) const
-{
-    // For each area, log the criterion state and the DispatchableProduction variable values for the
-    // cluster candidates of the area
     for (const auto& [areaName, area]: areas)
     {
-        std::stringstream ss;
+        std::ostringstream ss;
         ss << "\n  Criterion state for area " << areaName << ": " << to_string(area.criterionState)
            << " | max oscillation reached : " << std::boolalpha << area.maxOscillationReached()
-           << "\n";
-        ss << "  Average criteria value: " << area.avgCriteria;
-        if (area.criterionState != CriterionState::VALID)
+           << "\n"
+           << "  Average criteria value: " << area.avgCriteria;
+        if (area.criterionState == CriterionState::HIGHER)
         {
-            double threshold;
-            if (area.criterionState == CriterionState::HIGHER)
-            {
-                ss << " (which is above the threshold of " << higherThreshold(area) << ")";
-            }
-            else
-            {
-                ss << " (which is below the threshold of " << lowerThreshold(area) << ")";
-            }
+            ss << " (which is above the threshold of " << area.higherThreshold() << ")";
+        }
+        else if (area.criterionState != CriterionState::VALID)
+        {
+            ss << " (which is below the threshold of " << area.lowerThreshold() << ")";
         }
         ss << "\n";
 
-        for (const auto& [candidateName, investmentCandidate]: area.investmentCandidates)
-        {
-            ss << "  Invested capacity for cluster candidate " << candidateName << ": "
-               << investmentCandidate.installedCapacity
-               << " | oscillation : " << investmentCandidate.oscillationCounter << "\n";
-        }
-        for (const auto& [candidateName, decommissioningCandidate]: area.decommissioningCandidates)
-        {
-            ss << "  Decommissioned capacity for cluster candidate " << candidateName << ": "
-               << decommissioningCandidate.installedCapacity
-               << " | oscillation : " << decommissioningCandidate.oscillationCounter << "\n";
-        }
+        describeCandidates(ss, "Invested", area.investmentCandidates);
+        describeCandidates(ss, "Decommissioned", area.decommissioningCandidates);
 
-        logger->display_message(ss.str(),
-                                LogUtils::LOGLEVEL::INFO,
-                                PROBLEM_GENERATION_LOGGER_CONTEXT);
-    }
-}
-
-void Balancing::initializeIterativeLogCSV(const std::filesystem::path iterationsLogFileName) const
-{
-    std::ofstream file(iterationsLogFileName);
-    if (!file.is_open())
-    {
-        throw std::runtime_error("Failed to open iterative log file for writing: "
-                                 + iterationsLogFileName.string());
-    }
-    // header
-    file << "iteration,zone,criteria,action,cluster candidate,capacity change\n";
-}
-
-void Balancing::saveIterativeAreasViewToCSV(int iteration,
-                                            const std::filesystem::path& iterationsLogFileName)
-{
-    std::ofstream file(iterationsLogFileName, std::ios_base::app);
-    if (!file.is_open())
-    {
-        throw std::runtime_error("Failed to open iterative log file for writing: "
-                                 + iterationsLogFileName.string());
-    }
-    std::string action;
-    auto writeLineToFile = [&]<typename T>(const std::string& areaName,
-                                           const std::string& candidateName,
-                                           const CriterionState& criterionState,
-                                           const Candidate<T>& candidate)
-    {
-        // only writing the line if capacity has been modified, i.e. an action has been
-        // performed
-        if (candidate.installedCapacity != candidate.previousInstalledCapacity)
-        {
-            std::string_view lastAction = areas.at(areaName).lastAction.has_value()
-                                            ? to_string(areas.at(areaName).lastAction.value())
-                                            : "NOACTION";
-            file << iteration << "," << areaName << "," << to_string(criterionState) << ","
-                 << lastAction << "," << candidateName << ","
-                 << candidate.installedCapacity - candidate.previousInstalledCapacity << "\n";
-        }
-    };
-
-    for (auto& [areaName, area]: areas)
-    {
-        for (auto& [candidateName, investmentCandidate]: area.investmentCandidates)
-        {
-            writeLineToFile(areaName, candidateName, area.criterionState, investmentCandidate);
-            investmentCandidate.previousInstalledCapacity = investmentCandidate.installedCapacity;
-        }
-        for (auto& [candidateName, decommissioningCandidate]: area.decommissioningCandidates)
-        {
-            writeLineToFile(areaName, candidateName, area.criterionState, decommissioningCandidate);
-            decommissioningCandidate.previousInstalledCapacity = decommissioningCandidate
-                                                                   .installedCapacity;
-        }
-    }
-}
-
-void Balancing::saveCandidatesResultsToCSV(const std::filesystem::path& outputPath) const
-{
-    std::ofstream file(outputPath);
-    if (!file.is_open())
-    {
-        throw std::runtime_error("Failed to open file for writing: " + outputPath.string());
-    }
-
-    file << "area name,candidate name,capacity,capacity change\n";
-
-    for (const auto& [areaName, area]: areas)
-    {
-        for (const auto& [candidateName, investmentCandidate]: area.investmentCandidates)
-        {
-            file << areaName << "," << candidateName << "," << investmentCandidate.installedCapacity
-                 << ","
-                 << investmentCandidate.installedCapacity
-                      - investmentCandidate.initInstalledCapacity
-                 << "\n";
-        }
-        for (const auto& [candidateName, decommissioningCandidate]: area.decommissioningCandidates)
-        {
-            file << areaName << "," << candidateName << ","
-                 << decommissioningCandidate.installedCapacity << ","
-                 << decommissioningCandidate.installedCapacity
-                      - decommissioningCandidate.initInstalledCapacity
-                 << "\n";
-        }
-    }
-}
-
-void Balancing::saveAreasViewToCSV(const std::filesystem::path& outputPath) const
-{
-    std::ofstream file(outputPath);
-    if (!file.is_open())
-    {
-        throw std::runtime_error("Failed to open file for writing: " + outputPath.string());
-    }
-
-    file << "area,criteria "
-            "value,criteria target,criteria lower bound,criteria upper bound,status,total capacity "
-            "change\n";
-
-    for (const auto& [areaName, area]: areas)
-    {
-        const double criteriaValue = area.avgCriteria;
-        std::string status = (criteriaValue < lowerThreshold(area))    ? "LOWER"
-                             : (criteriaValue > higherThreshold(area)) ? "HIGHER"
-                                                                       : "NO ACTION";
-        double totalCapacityChange(0.0);
-        for (const auto& investmentCandidate: area.investmentCandidates | std::views::values)
-        {
-            totalCapacityChange += investmentCandidate.installedCapacity
-                                   - investmentCandidate.initInstalledCapacity;
-        }
-        for (const auto& decommissioningCandidate:
-             area.decommissioningCandidates | std::views::values)
-        {
-            totalCapacityChange += decommissioningCandidate.installedCapacity
-                                   - decommissioningCandidate.initInstalledCapacity;
-        }
-        file << areaName << "," << criteriaValue << "," << area.reliabilityStandard << ","
-             << lowerThreshold(area) << "," << higherThreshold(area) << "," << status << ","
-             << totalCapacityChange << "\n";
+        logMessage(ss.str());
     }
 }
 
@@ -772,122 +739,121 @@ std::string Balancing::describeAction(const AreaCandidate& areaCandidate,
 
     std::ostringstream os;
     os << " Area: " << areaCandidate.first << " criteria: " << area.avgCriteria << " ["
-       << lowerThreshold(area) << "-" << higherThreshold(area) << "]"
+       << area.lowerThreshold() << "-" << area.higherThreshold() << "]"
        << " action: " << to_string(action) << " cluster candidate: " << areaCandidate.second
        << " new capacity: " << newCapacity << " delta: " << (newCapacity - previousCapacity);
     return os.str();
 }
 
-void Balancing::run(const int maxIterations, GreedyBalancingFinder& gbf)
+void Balancing::initializeIterativeLogCSV(const std::filesystem::path& iterationsLogFilePath) const
 {
-    // logs containing all values for every iteration
-    const std::filesystem::path iterationsLogFilePath = directories.simulation_dir
-                                                        / "iterations_values_log.csv";
-    // logs containing all values reached at the end of the simulation
-    const std::filesystem::path finalCriteriaFilePath = directories.simulation_dir
-                                                        / "final_criteria.csv";
+    auto file = openForWriting(iterationsLogFilePath);
+    file << "iteration,zone,criteria,action,cluster candidate,capacity change\n";
+}
 
-    logger->display_message("Initialize logs",
-                            LogUtils::LOGLEVEL::INFO,
-                            PROBLEM_GENERATION_LOGGER_CONTEXT);
+void Balancing::saveIterativeAreasViewToCSV(int iteration,
+                                            const std::filesystem::path& iterationsLogFilePath)
+{
+    auto file = openForWriting(iterationsLogFilePath, std::ios_base::app);
+    for (auto& [areaName, area]: areas)
+    {
+        for (auto& [candidateName, candidate]: area.investmentCandidates)
+        {
+            writeCapacityChange(file, iteration, areaName, area, candidateName, candidate);
+        }
+        for (auto& [candidateName, candidate]: area.decommissioningCandidates)
+        {
+            writeCapacityChange(file, iteration, areaName, area, candidateName, candidate);
+        }
+    }
+}
+
+void Balancing::saveCandidatesResultsToCSV(const std::filesystem::path& outputPath) const
+{
+    auto file = openForWriting(outputPath);
+    file << "area name,candidate name,capacity,capacity change\n";
+    forEachCandidate(
+      areas,
+      [&file](const std::string& areaName, const std::string& candidateName, const auto& candidate)
+      {
+          file << areaName << "," << candidateName << "," << candidate.installedCapacity << ","
+               << candidate.installedCapacity - candidate.initInstalledCapacity << "\n";
+      });
+}
+
+void Balancing::saveAreasViewToCSV(const std::filesystem::path& outputPath) const
+{
+    auto file = openForWriting(outputPath);
+    file << "area,criteria value,criteria target,criteria lower bound,criteria upper bound,status,"
+            "total capacity change\n";
+    for (const auto& [areaName, area]: areas)
+    {
+        file << areaName << "," << area.avgCriteria << "," << area.reliabilityStandard << ","
+             << area.lowerThreshold() << "," << area.higherThreshold() << ","
+             << criteriaStatus(area) << "," << totalCapacityChange(area) << "\n";
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Main loop
+// ---------------------------------------------------------------------------
+
+void Balancing::run(int maxIterations, GreedyBalancingFinder& gbf)
+{
+    const auto iterationsLogFilePath = directories.simulation_dir / ITERATIONS_LOG_FILE;
+    const auto finalCriteriaFilePath = directories.simulation_dir / FINAL_CRITERIA_FILE;
+    const auto finalCapacitiesFilePath = directories.simulation_dir / FINAL_CAPACITIES_FILE;
+
+    const auto logRun = [this](const std::string& message)
+    { logger->display_message(message, LogUtils::LOGLEVEL::INFO, logger->CONTEXT); };
+
+    logMessage("Initialize balancing logs");
     initializeIterativeLogCSV(iterationsLogFilePath);
 
-    std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues;
-    // First iteration will be iteration 0 (the iteration before any modification is applied to
-    // the problems)
+    SimuValues simuValues;
+    // First iteration is iteration 0: no modification is applied to the problems yet
     int iteration = -1;
-    auto startBalancingProcess = std::chrono::system_clock::now();
-    logger->display_message("Starting balancing process",
-                            LogUtils::LOGLEVEL::INFO,
-                            logger->CONTEXT);
-    logAreasView(simuValues);
-    bool blocked = false;
-    while (!isBalanced() && !blocked && iteration < maxIterations)
-    {
-        iteration++;
-        auto startIteration = std::chrono::system_clock::now();
-        logger->display_message("Iteration " + std::to_string(iteration),
-                                LogUtils::LOGLEVEL::INFO,
-                                logger->CONTEXT);
-        std::map<AreaCandidate, CapacityAction> areaCandidatesToModify;
-        // For the first iteration, simuValues is empty and no modification should be applied
-        if (!simuValues.empty())
-        {
-            areaCandidatesToModify = findAreaCandidatesToModify(simuValues);
-        }
-        if (areaCandidatesToModify.empty() && iteration > 0)
-        {
-            logger->display_message(
-              (std::stringstream() << "No actions found in any area, stop the run").str(),
-              LogUtils::LOGLEVEL::INFO,
-              PROBLEM_GENERATION_LOGGER_CONTEXT);
-            blocked = true;
-        }
-        else
-        {
-            std::map<AreaCandidate, double> previousCandidateCapacity;
-            if (!areaCandidatesToModify.empty())
-            {
-                logger->display_message("Apply action",
-                                        LogUtils::LOGLEVEL::INFO,
-                                        PROBLEM_GENERATION_LOGGER_CONTEXT);
-                for (const auto& [areaCandidate, action]: areaCandidatesToModify)
-                {
-                    previousCandidateCapacity[areaCandidate] = getCandidateCurrentCapacity(
-                      action,
-                      areaCandidate);
-                }
-                initializeCandidatesToModify(areaCandidatesToModify);
-                for (const auto& [areaCandidate, action]: areaCandidatesToModify)
-                {
-                    double newCandidateCapacity = getCandidateCurrentCapacity(action,
-                                                                              areaCandidate);
-                    logger->display_message(describeAction(areaCandidate,
-                                                           action,
-                                                           previousCandidateCapacity.at(
-                                                             areaCandidate)),
-                                            LogUtils::LOGLEVEL::INFO,
-                                            PROBLEM_GENERATION_LOGGER_CONTEXT);
-                }
-            }
-            tbb::parallel_for_each(
-              problemManager->getProblemIds(),
-              [&](const auto& pbId)
-              {
-                  std::shared_ptr<Problem> problem = problemManager->getProblemFromId(pbId);
-                  if (!areaCandidatesToModify.empty())
-                  {
-                      applyActionToCandidate(pbId, problem, areaCandidatesToModify);
-                  }
-                  gbf.computeCriterionAndPrice(pbId, problem);
-              });
-            simuValues = gbf.getBalancingResults();
+    const auto startBalancingProcess = std::chrono::steady_clock::now();
+    logMessage("Starting balancing process");
+    logAreasView();
 
-            auto endIteration = std::chrono::system_clock::now();
-            saveIterativeAreasViewToCSV(iteration, iterationsLogFilePath);
-            updateAreaCriteriaData(simuValues);
-            logAreasView(simuValues);
-            std::chrono::duration<double> elapsed_iteration_seconds = endIteration - startIteration;
-            logger->display_message("Elapsed time for iteration " + std::to_string(iteration) + ": "
-                                      + formatDuration(elapsed_iteration_seconds),
-                                    LogUtils::LOGLEVEL::INFO,
-                                    logger->CONTEXT);
+    while (!isBalanced() && iteration < maxIterations)
+    {
+        ++iteration;
+        const auto startIteration = std::chrono::steady_clock::now();
+        logRun("Iteration " + std::to_string(iteration));
+
+        // simuValues is empty on the first iteration: nothing to modify yet
+        const AreaActions areaCandidatesToModify = simuValues.empty()
+                                                     ? AreaActions{}
+                                                     : findAreaCandidatesToModify(simuValues);
+        if (iteration > 0 && areaCandidatesToModify.empty())
+        {
+            logMessage("No actions found in any area, stop the run");
+            break;
         }
-    };
-    logger->display_message("Final iteration " + std::to_string(++iteration),
-                            LogUtils::LOGLEVEL::INFO,
-                            logger->CONTEXT);
-    logAreasView(simuValues);
-    saveCandidatesResultsToCSV(directories.simulation_dir / "final_capacities.csv");
+
+        applyCapacityActions(areaCandidatesToModify);
+        simuValues = solveAndComputeCriterionAndPrice(areaCandidatesToModify, gbf);
+        const auto endIteration = std::chrono::steady_clock::now();
+
+        saveIterativeAreasViewToCSV(iteration, iterationsLogFilePath);
+        updateAreaCriteriaData(simuValues);
+        logAreasView();
+
+        const std::chrono::duration<double> iterationDuration = endIteration - startIteration;
+        logRun("Elapsed time for iteration " + std::to_string(iteration) + ": "
+               + formatDuration(iterationDuration));
+    }
+
+    logMessage("Final iteration " + std::to_string(iteration));
+    logAreasView();
+    saveCandidatesResultsToCSV(finalCapacitiesFilePath);
     saveAreasViewToCSV(finalCriteriaFilePath);
-    auto endProblemUpdate = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed_update_seconds = endProblemUpdate - startBalancingProcess;
-    logger->display_message("Balancing process ended after " + std::to_string(iteration)
-                              + " iterations. In " + formatDuration(elapsed_update_seconds),
-                            LogUtils::LOGLEVEL::INFO,
-                            logger->CONTEXT);
-    logger->display_message(isBalanced() ? "The system is balanced."
-                                         : "The system is not balanced.",
-                            LogUtils::LOGLEVEL::INFO,
-                            logger->CONTEXT);
+
+    const std::chrono::duration<double> totalDuration = std::chrono::steady_clock::now()
+                                                        - startBalancingProcess;
+    logMessage("Balancing process ended after " + std::to_string(iteration) + " iterations. In "
+               + formatDuration(totalDuration));
+    logMessage(isBalanced() ? "The system is balanced." : "The system is not balanced.");
 }
