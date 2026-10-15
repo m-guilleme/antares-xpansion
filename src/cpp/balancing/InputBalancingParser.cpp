@@ -1,7 +1,5 @@
 #include "include/antares-xpansion/balancing/InputBalancingParser.h"
 
-/// @brief Constructor of the BalancingParser class
-/// @param pathToYamlConfigFile The path to the YAML configuration file
 InputBalancingParser::InputBalancingParser(const std::filesystem::path& pathToYamlConfigFile):
     pathToYamlConfigFile(pathToYamlConfigFile),
     defaultReliabilityStandardDeadBandUp(0.0),
@@ -17,8 +15,6 @@ InputBalancingParser::InputBalancingParser(const std::filesystem::path& pathToYa
     }
 }
 
-/// @brief Parse the YAML configuration file and fill the InputBalancingParser attributes with the
-/// parsed data
 std::map<std::string, Area> InputBalancingParser::parse()
 {
     try
@@ -28,7 +24,7 @@ std::map<std::string, Area> InputBalancingParser::parse()
         parseGlobalSettings();
         parseDecommissioningCandidatesTypes();
         parseInvestmentCandidatesTypes();
-        parseAreasSettings();
+        parseAreas();
         return areas;
     }
     catch (const YAML::Exception& e)
@@ -48,8 +44,6 @@ static void requireField(const YAML::Node& node,
     }
 }
 
-/// @brief Parse the global settings from the YAML configuration file : reliability standard dead
-/// bands and indicator
 void InputBalancingParser::parseGlobalSettings()
 {
     if (config["reliability_standard_dead_band_up"])
@@ -88,8 +82,6 @@ void InputBalancingParser::parseGlobalSettings()
     }
 }
 
-/// @brief Parse the decommissioning candidates types from the YAML configuration file : fixed O&M
-/// costs
 void InputBalancingParser::parseDecommissioningCandidatesTypes()
 {
     if (!config["decommissioning_candidates_types"])
@@ -115,8 +107,6 @@ void InputBalancingParser::parseDecommissioningCandidatesTypes()
     }
 }
 
-/// @brief Parse the investment candidates types from the YAML configuration file : derating,
-/// expansion potential, investment cost and fixed O&M costs
 void InputBalancingParser::parseInvestmentCandidatesTypes()
 {
     if (!config["investment_candidates_types"])
@@ -184,9 +174,7 @@ static void parseCandidatesToType(const YAML::Node& areaData,
     }
 }
 
-/// @brief Parse the areas from the YAML configuration file : reliability standard, decommissioning
-/// and investment increments, candidates to type mapping
-void InputBalancingParser::parseAreasSettings()
+void InputBalancingParser::parseAreas()
 {
     if (!config["areas"])
     {
@@ -241,8 +229,6 @@ void InputBalancingParser::parseAreasSettings()
     }
 }
 
-/// @brief Get the reliability standard indicator
-/// @return The reliability standard indicator
 Benders::Criterion::Type InputBalancingParser::getReliabilityStandardIndicator() const
 {
     return reliabilityStandardIndicator;
