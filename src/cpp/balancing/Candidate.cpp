@@ -6,7 +6,6 @@ void CandidateBase::setOneWeekBoundsData(Antares::Solver::WeeklyProblemId pbId,
     boundsData[pbId] = oneWeekBoundsData;
 }
 
-// Sequential: create all map nodes up front so the parallel phase never modifies the map structure
 void CandidateBase::prepareBoundsData(const std::set<Antares::Solver::WeeklyProblemId>& pbIds)
 {
     for (const auto& pbId: pbIds)
@@ -15,7 +14,6 @@ void CandidateBase::prepareBoundsData(const std::set<Antares::Solver::WeeklyProb
     }
 }
 
-// Thread-safe as long as each pbId is handled by exactly one thread
 void CandidateBase::computeAndSetOneWeekCapacityData(Antares::Solver::WeeklyProblemId pbId,
                                                      const std::shared_ptr<Problem>& problem)
 {
@@ -33,7 +31,6 @@ void CandidateBase::computeAndSetOneWeekCapacityData(Antares::Solver::WeeklyProb
     boundsData.at(pbId) = std::move(oneWeekBoundsData); // at(): lookup only, no insertion
 }
 
-// Sequential: same result as the old in-loop updates
 void CandidateBase::updateCapacitiesFromBounds()
 {
     double maxUpperBound = installedCapacity;

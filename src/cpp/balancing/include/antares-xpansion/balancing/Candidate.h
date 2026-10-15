@@ -102,12 +102,27 @@ struct CandidateBase
     std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> dispProdVarIndices;
     std::map<Antares::Solver::WeeklyProblemId, std::vector<BoundData>> boundsData;
 
+    /// @brief Set the bounds data of one week problem
+    /// @param pbId The id of the weekly problem
+    /// @param oneWeekBoundsData The hourly bounds data of the week
     void setOneWeekBoundsData(Antares::Solver::WeeklyProblemId pbId,
                               std::vector<BoundData> oneWeekBoundsData);
+
+    /// @brief Update the oscillation status of the candidate after an action has been applied
+    /// @param action The action applied to the candidate
     void updateOscillationStatus(const CapacityAction& action);
+
+    /// @brief Prepare the bounds data storage before it is filled problem by problem
+    /// @param pbIds The ids of the weekly problems to prepare the bounds data for
     void prepareBoundsData(const std::set<Antares::Solver::WeeklyProblemId>& pbIds);
+
+    /// @brief Compute the bounds data of one week problem and store it
+    /// @param pbId The id of the weekly problem
+    /// @param problem The weekly problem to compute the bounds data from
     void computeAndSetOneWeekCapacityData(Antares::Solver::WeeklyProblemId pbId,
                                           const std::shared_ptr<Problem>& problem);
+
+    /// @brief Update the candidate capacities from the computed bounds data
     void updateCapacitiesFromBounds();
 };
 

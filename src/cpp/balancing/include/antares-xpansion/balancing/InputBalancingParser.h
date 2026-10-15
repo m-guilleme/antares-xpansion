@@ -19,6 +19,7 @@ public:
     InputBalancingParser(const std::filesystem::path& pathToYamlConfigFile = "");
     /// @brief Parse the YAML configuration file and fill the InputBalancingParser attributes with
     /// the parsed data
+    /// @return The map of the areas data
     std::map<std::string, Area> parse();
     /// @brief Get the reliability standard indicator
     /// @return The reliability standard indicator

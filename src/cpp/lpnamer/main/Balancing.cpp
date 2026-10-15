@@ -614,7 +614,7 @@ void Balancing::computeCandidateInstalledCapacity(CapacityAction action,
     }
 }
 
-void Balancing::initializeCandidatesToModify(const AreaActions& areaCandidatesToModify)
+void Balancing::prepareCandidatesToModify(const AreaActions& areaCandidatesToModify)
 {
     for (const auto& [areaCandidate, action]: areaCandidatesToModify)
     {
@@ -648,7 +648,7 @@ void Balancing::applyCapacityActions(const AreaActions& areaCandidatesToModify)
         previousCapacities[areaCandidate] = getCandidateCurrentCapacity(action, areaCandidate);
     }
 
-    initializeCandidatesToModify(areaCandidatesToModify);
+    prepareCandidatesToModify(areaCandidatesToModify);
 
     for (const auto& [areaCandidate, action]: areaCandidatesToModify)
     {

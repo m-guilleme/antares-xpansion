@@ -32,36 +32,6 @@ bool isInvestmentAction(const CapacityAction& action)
     return action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT;
 }
 
-// Calls func on the investment candidate (INVESTMENT / DISINVESTMENT) or on the
-// decommissioning candidate (DECOMMISSIONING / RECOMMISSIONING) matching the action.
-// func must be a generic lambda returning the same type for both candidate types.
-template<typename Func>
-auto visitCandidate(Balancing& pbg,
-                    const std::string& areaName,
-                    const std::string& candidateName,
-                    const CapacityAction& action,
-                    Func&& func)
-{
-    if (isInvestmentAction(action))
-    {
-        return func(pbg.getInvestmentCandidate(areaName, candidateName));
-    }
-    return func(pbg.getDecommissioningCandidate(areaName, candidateName));
-}
-
-HourlyIndices getDispProdVarIndices(Balancing& pbg,
-                                    const std::string& areaName,
-                                    const std::string& candidateName,
-                                    const CapacityAction& action)
-{
-    return visitCandidate(pbg,
-                          areaName,
-                          candidateName,
-                          action,
-                          [](auto& candidate) -> HourlyIndices
-                          { return candidate.dispProdVarIndices; });
-}
-
 std::shared_ptr<ProblemManager> makeXpressProblemManager()
 {
     return std::make_shared<ProblemManager>("xpress", "mps", false, true, "initial_problems");
@@ -125,6 +95,36 @@ protected:
                               tmpDir,
                               std::filesystem::copy_options::recursive
                                 | std::filesystem::copy_options::overwrite_existing);
+    }
+
+    // Calls func on the investment candidate (INVESTMENT / DISINVESTMENT) or on the
+    // decommissioning candidate (DECOMMISSIONING / RECOMMISSIONING) matching the action.
+    // func must be a generic lambda returning the same type for both candidate types.
+    template<typename Func>
+    auto visitCandidate(Balancing& pbg,
+                        const std::string& areaName,
+                        const std::string& candidateName,
+                        const CapacityAction& action,
+                        Func&& func)
+    {
+        if (isInvestmentAction(action))
+        {
+            return func(pbg.getInvestmentCandidate(areaName, candidateName));
+        }
+        return func(pbg.getDecommissioningCandidate(areaName, candidateName));
+    }
+
+    HourlyIndices getDispProdVarIndices(Balancing& pbg,
+                                        const std::string& areaName,
+                                        const std::string& candidateName,
+                                        const CapacityAction& action)
+    {
+        return visitCandidate(pbg,
+                              areaName,
+                              candidateName,
+                              action,
+                              [](auto& candidate) -> HourlyIndices
+                              { return candidate.dispProdVarIndices; });
     }
 
     // Copies the study into a temporary directory and builds a ProblemGenerationForBalancing
@@ -313,7 +313,7 @@ protected:
         // run applyActionToCandidate
         std::map<AreaCandidate, CapacityAction> areaCandidatesToModify = {
           {{areaName, candidateName}, action}};
-        pbg.initializeCandidatesToModify(areaCandidatesToModify);
+        pbg.prepareCandidatesToModify(areaCandidatesToModify);
         for (const auto& pbId: problemManager->getProblemIds())
         {
             auto problem = problemManager->getProblemFromId(pbId);

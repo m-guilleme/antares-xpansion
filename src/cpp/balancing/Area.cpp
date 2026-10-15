@@ -50,9 +50,8 @@ Candidate<DecommissioningCandidateType>& Area::getDecommissioningCandidate(
   const std::string& candidateName)
 {
     return decommissioningCandidates.at(candidateName);
-} /// @brief Check if investment is possible for the area
+}
 
-/// @return true if investment is possible, false otherwise
 bool Area::isInvestmentPossible() const
 {
     return std::ranges::any_of(investmentCandidates,
@@ -62,8 +61,6 @@ bool Area::isInvestmentPossible() const
                                });
 }
 
-/// @brief Check if decommissioning is possible for the area
-/// @return true if decommissioning is possible, false otherwise
 bool Area::isDecommissioningPossible() const
 {
     return std::ranges::any_of(decommissioningCandidates,
@@ -73,8 +70,6 @@ bool Area::isDecommissioningPossible() const
                                });
 }
 
-/// @brief Check if disinvestment is possible for the area
-/// @return true if disinvestment is possible, false otherwise
 bool Area::isDisinvestmentPossible() const
 {
     return std::ranges::any_of(investmentCandidates,
@@ -84,8 +79,6 @@ bool Area::isDisinvestmentPossible() const
                                });
 }
 
-/// @brief Check if recommissioning is possible for the area
-/// @return true if recommissioning is possible, false otherwise
 bool Area::isRecommissioningPossible() const
 {
     return std::ranges::any_of(decommissioningCandidates,
@@ -95,8 +88,6 @@ bool Area::isRecommissioningPossible() const
                                });
 }
 
-/// @brief Check if an area reachs max oscillation through one of their candidate
-/// @return true if the area has reached mas oscillation, false otherwise
 bool Area::maxOscillationReached() const
 {
     bool maxOscillationReached = false;
@@ -125,10 +116,6 @@ double Area::extraCost(const Candidate<T>& candidate)
     return candidate.installedCapacity * candidate.type->unitCost();
 }
 
-/// @brief Find the best candidate for a given area
-/// @param action The action to apply for which the best candidate is looked for
-/// @param pbOutput AvgCriteria and rice of the problem
-/// @param solution Solution of the problem
 void Area::updateRentabilityWithProblem(const CapacityAction action,
                                         const PbOutput pbOutput,
                                         const std::vector<double> solution)
@@ -188,4 +175,14 @@ bool Area::isCandidatesRentabilityEmpty() const
 std::map<std::string, double> Area::getCandidatesRentability() const
 {
     return candidatesRentability;
+}
+
+double Area::lowerThreshold() const
+{
+    return reliabilityStandard - reliabilityStandardDeadBandDown;
+}
+
+double Area::higherThreshold() const
+{
+    return reliabilityStandard + reliabilityStandardDeadBandUp;
 }
