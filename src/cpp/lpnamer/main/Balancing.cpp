@@ -332,7 +332,7 @@ std::string_view criteriaStatus(const Area& area)
     {
         return "HIGHER";
     }
-    return "NO ACTION";
+    return "VALID";
 }
 } // namespace
 
@@ -784,8 +784,9 @@ void Balancing::saveCandidatesResultsToCSV(const std::filesystem::path& outputPa
 void Balancing::saveAreasViewToCSV(const std::filesystem::path& outputPath) const
 {
     auto file = openForWriting(outputPath);
-    file << "area,criteria value,criteria target,criteria lower bound,criteria upper bound,status,"
-            "total capacity change\n";
+    file
+      << "area,last avg criteria,criteria target,criteria lower bound,criteria upper bound,status,"
+         "total capacity change\n";
     for (const auto& [areaName, area]: areas)
     {
         file << areaName << "," << area.avgCriteria << "," << area.reliabilityStandard << ","
