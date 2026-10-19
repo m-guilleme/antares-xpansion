@@ -64,9 +64,13 @@ bool Area::isInvestmentPossible() const
 bool Area::isDecommissioningPossible() const
 {
     return std::ranges::any_of(decommissioningCandidates,
-                               [](const auto& entry) {
+                               [this](const auto& entry)
+                               {
                                    return entry.second.installedCapacity
-                                          > entry.second.type->decommissioningPotential;
+                                            > entry.second.type->decommissioningPotential
+                                          && currentDecommissioningIncrement
+                                               >= entry.second.initInstalledCapacity
+                                                    / entry.second.type->units;
                                });
 }
 

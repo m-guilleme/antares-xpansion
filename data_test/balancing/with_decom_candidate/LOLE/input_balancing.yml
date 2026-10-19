@@ -28,6 +28,7 @@ decommissioning_candidates_types:
     derating: 0.0
     expansion_potential: 0
     decommissioning_cost: 0
+    units: 50
     fixed_om_costs: 1000
     decommissioning_potential: 0
 

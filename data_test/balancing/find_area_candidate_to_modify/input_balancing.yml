@@ -45,11 +45,13 @@ decommissioning_candidates_types:
     derating: 0.0
     decommissioning_potential: 0.0
     decommissioning_cost: 10000
+    units: 50
     fixed_om_costs: 1000
   decom_type_2:
     derating: 0.0
     decommissioning_potential: 0.0
     decommissioning_cost: 10000
+    units: 50
     fixed_om_costs: 1000
 investment_candidates_types:
   invest_type_1:

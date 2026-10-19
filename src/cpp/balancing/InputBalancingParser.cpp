@@ -34,14 +34,15 @@ std::map<std::string, Area> InputBalancingParser::parse()
 }
 
 /// @brief Throws if a required YAML field is missing, with a descriptive message
-static void requireField(const YAML::Node& node,
-                         const std::string& field,
-                         const std::string& context)
+template<typename T>
+static T requireField(const YAML::Node& node, const std::string& field, const std::string& context)
 {
-    if (!node[field])
+    const YAML::Node value = node[field];
+    if (!value)
     {
         throw std::runtime_error("Missing '" + field + "' for " + context);
     }
+    return value.as<T>();
 }
 
 void InputBalancingParser::parseGlobalSettings()
@@ -94,15 +95,13 @@ void InputBalancingParser::parseDecommissioningCandidatesTypes()
         std::string typeName = typeNode.first.as<std::string>();
         YAML::Node typeData = typeNode.second;
         const std::string context = "decommissioning candidate of type: " + typeName;
-
-        requireField(typeData, "fixed_om_costs", context);
-        requireField(typeData, "decommissioning_potential", context);
-        requireField(typeData, "decommissioning_cost", context);
-
         auto type = std::make_shared<DecommissioningCandidateType>();
-        type->fixedOmCosts = typeNode.second["fixed_om_costs"].as<double>();
-        type->decommissioningPotential = typeData["decommissioning_potential"].as<double>();
-        type->decommissioningCost = typeData["decommissioning_cost"].as<double>();
+        type->fixedOmCosts = requireField<double>(typeData, "fixed_om_costs", context);
+        type->decommissioningPotential = requireField<double>(typeData,
+                                                              "decommissioning_potential",
+                                                              context);
+        type->decommissioningCost = requireField<double>(typeData, "decommissioning_cost", context);
+        type->units = requireField<double>(typeData, "units", context);
         decommissioningCandidatesTypes[typeName] = std::move(type);
     }
 }
@@ -119,18 +118,11 @@ void InputBalancingParser::parseInvestmentCandidatesTypes()
         std::string typeName = typeNode.first.as<std::string>();
         YAML::Node typeData = typeNode.second;
         const std::string context = "investment candidate of type: " + typeName;
-
-        requireField(typeData, "derating", context);
-        requireField(typeData, "expansion_potential", context);
-        requireField(typeData, "investment_cost", context);
-        requireField(typeData, "fixed_om_costs", context);
-
         auto type = std::make_shared<InvestmentCandidateType>();
-        type->derating = typeData["derating"].as<double>();
-        type->expansionPotential = typeData["expansion_potential"].as<double>();
-        type->investmentCost = typeData["investment_cost"].as<double>();
-        type->fixedOmCosts = typeData["fixed_om_costs"].as<double>();
-
+        type->derating = requireField<double>(typeData, "derating", context);
+        type->expansionPotential = requireField<double>(typeData, "expansion_potential", context);
+        type->investmentCost = requireField<double>(typeData, "investment_cost", context);
+        type->fixedOmCosts = requireField<double>(typeData, "fixed_om_costs", context);
         investmentCandidatesTypes[typeName] = std::move(type);
     }
 }
@@ -156,9 +148,13 @@ static void parseCandidatesToType(const YAML::Node& areaData,
                                   std::map<std::string, Candidate<T>>& candidates)
 {
     const std::string context = label + " candidate of type: " + yamlKey;
-    requireField(areaData, yamlKey, context);
+    YAML::Node areaNode = areaData[yamlKey];
+    if (!areaNode)
+    {
+        throw std::runtime_error("Missing '" + yamlKey + "' for " + context);
+    }
 
-    for (const auto& candidate: areaData[yamlKey])
+    for (const auto& candidate: areaNode)
     {
         std::string candidateName = candidate.first.as<std::string>();
         std::replace(candidateName.begin(), candidateName.end(), ' ', '*');
@@ -187,19 +183,16 @@ void InputBalancingParser::parseAreas()
         YAML::Node areaData = areaNode.second;
         const std::string context = "area: " + areaName;
 
-        requireField(areaData, "reliability_standard", context);
-        requireField(areaData, "decommissioning_increment", context);
-        requireField(areaData, "investment_increment", context);
-        requireField(areaData, "max_oscillation", context);
-
         Area area;
         area.name = areaName;
-        area.reliabilityStandard = areaData["reliability_standard"].as<double>();
-        area.decommissioningIncrement = areaData["decommissioning_increment"].as<double>();
+        area.reliabilityStandard = requireField<double>(areaData, "reliability_standard", context);
+        area.decommissioningIncrement = requireField<double>(areaData,
+                                                             "decommissioning_increment",
+                                                             context);
         area.currentDecommissioningIncrement = area.decommissioningIncrement;
-        area.investmentIncrement = areaData["investment_increment"].as<double>();
+        area.investmentIncrement = requireField<double>(areaData, "investment_increment", context);
         area.currentInvestmentIncrement = area.investmentIncrement;
-        area.maxOscillation = areaData["max_oscillation"].as<int>();
+        area.maxOscillation = requireField<int>(areaData, "max_oscillation", context);
 
         area.reliabilityStandardDeadBandUp = areaData["reliability_standard_dead_band_up"]
                                                ? areaData["reliability_standard_dead_band_up"]

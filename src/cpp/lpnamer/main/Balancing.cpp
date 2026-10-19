@@ -598,17 +598,24 @@ void Balancing::computeCandidateInstalledCapacity(CapacityAction action,
     case CapacityAction::DECOMMISSIONING:
     {
         auto& candidate = area.getDecommissioningCandidate(candidateName);
-        candidate.installedCapacity = std::max(candidate.installedCapacity
-                                                 - area.currentDecommissioningIncrement,
-                                               candidate.type->decommissioningPotential);
+        const double lowerLimit = candidate.type->decommissioningPotential;
+        const double target = candidate.installedCapacity - area.currentDecommissioningIncrement;
+        const double unitCapacity = candidate.initInstalledCapacity / candidate.type->units;
+        const double unitsCount = std::max(target, lowerLimit) / unitCapacity;
+        const bool reachesLimit = target <= lowerLimit;
+        const double wholeUnits = reachesLimit ? std::floor(unitsCount) : std::ceil(unitsCount);
+        candidate.installedCapacity = wholeUnits * unitCapacity;
         break;
     }
     case CapacityAction::RECOMMISSIONING:
     {
         auto& candidate = area.getDecommissioningCandidate(candidateName);
-        candidate.installedCapacity = std::min(candidate.installedCapacity
-                                                 + area.currentDecommissioningIncrement,
-                                               candidate.initInstalledCapacity);
+        const double upperLimit = candidate.initInstalledCapacity;
+        const double target = candidate.installedCapacity + area.currentDecommissioningIncrement;
+        const double unitCapacity = candidate.initInstalledCapacity / candidate.type->units;
+        const double unitsCount = std::min(target, upperLimit) / unitCapacity;
+        const double wholeUnits = std::ceil(unitsCount);
+        candidate.installedCapacity = wholeUnits * unitCapacity;
         break;
     }
     }

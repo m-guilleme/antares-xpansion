@@ -158,7 +158,7 @@ protected:
         auto pbg = makeProblemGeneration("one_candidate_per_area", makeXpressProblemManager());
 
         // set real test data
-        InputBalancingParser balParser(dataTestDir / "find_area_cluster_to_modify"
+        InputBalancingParser balParser(dataTestDir / "find_area_candidate_to_modify"
                                        / "input_balancing.yml");
         pbg.areas = balParser.parse();
 

@@ -1,6 +1,6 @@
 reliability_standard_dead_band_up: 0.5
 reliability_standard_dead_band_down: 0.5
-reliability_standard_indicator: LOLE # Or NPCAP_HOURS Or UNSP_ENERG
+reliability_standard_indicator: LOLE
 
 areas:
   area2:
@@ -18,6 +18,7 @@ decommissioning_candidates_types:
     derating: 0.0
     expansion_potential: 0
     decommissioning_cost: 0
+    units: 50
     fixed_om_costs: 1000
     decommissioning_potential: 0
 
