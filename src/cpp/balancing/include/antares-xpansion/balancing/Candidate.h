@@ -73,7 +73,7 @@ struct InvestmentCandidateType
 
 struct DecommissioningCandidateType
 {
-    double decommissioningPotential, decommissioningCost, fixedOmCosts;
+    double decommissioningPotential, decommissioningCost = 0., fixedOmCosts;
     int units;
 
     double maxCapacity() const

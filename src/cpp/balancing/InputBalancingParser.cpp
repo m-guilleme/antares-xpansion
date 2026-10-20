@@ -45,6 +45,16 @@ static T requireField(const YAML::Node& node, const std::string& field, const st
     return value.as<T>();
 }
 
+template<typename T>
+static void optionalField(const YAML::Node& node, const std::string& field, T& parameter)
+{
+    const YAML::Node value = node[field];
+    if (value)
+    {
+        parameter = value.as<T>();
+    }
+}
+
 void InputBalancingParser::parseGlobalSettings()
 {
     if (config["reliability_standard_dead_band_up"])
@@ -100,7 +110,7 @@ void InputBalancingParser::parseDecommissioningCandidatesTypes()
         type->decommissioningPotential = requireField<double>(typeData,
                                                               "decommissioning_potential",
                                                               context);
-        type->decommissioningCost = requireField<double>(typeData, "decommissioning_cost", context);
+        optionalField(typeData, "decommissioning_cost", type->decommissioningCost);
         type->units = requireField<double>(typeData, "units", context);
         decommissioningCandidatesTypes[typeName] = std::move(type);
     }
@@ -192,8 +202,7 @@ void InputBalancingParser::parseAreas()
         area.currentDecommissioningIncrement = area.decommissioningIncrement;
         area.investmentIncrement = requireField<double>(areaData, "investment_increment", context);
         area.currentInvestmentIncrement = area.investmentIncrement;
-        area.maxOscillation = requireField<int>(areaData, "max_oscillation", context);
-
+        optionalField(areaData, "max_oscillation", area.maxOscillation);
         area.reliabilityStandardDeadBandUp = areaData["reliability_standard_dead_band_up"]
                                                ? areaData["reliability_standard_dead_band_up"]
                                                    .as<double>()

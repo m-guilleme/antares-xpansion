@@ -20,7 +20,7 @@ public:
     double currentInvestmentIncrement;
     std::optional<CapacityAction> lastAction;
     std::string name;
-    int maxOscillation;
+    int maxOscillation = 5;
     std::map<std::string, Candidate<DecommissioningCandidateType>> decommissioningCandidates;
     std::map<std::string, Candidate<InvestmentCandidateType>> investmentCandidates;
     CriterionState oldCriterionState{CriterionState::UNINITIALIZED};
