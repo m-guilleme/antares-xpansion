@@ -285,14 +285,29 @@ std::ofstream openForWriting(const std::filesystem::path& path,
     return file;
 }
 
-template<typename CandidateMap>
-void describeCandidates(std::ostream& out, std::string_view label, const CandidateMap& candidates)
+void describeInvestmentCandidates(
+  std::ostream& out,
+  const std::map<std::string, Candidate<InvestmentCandidateType>>& candidates)
 {
     for (const auto& [candidateName, candidate]: candidates)
     {
-        out << "  " << label << " capacity for cluster candidate " << candidateName << ": "
-            << candidate.installedCapacity << " | oscillation : " << candidate.oscillationCounter
-            << "\n";
+        out << " Invested capacity for cluster candidate " << candidateName << ": "
+            << candidate.installedCapacity - candidate.initInstalledCapacity
+            << " | total : " << candidate.installedCapacity
+            << " | oscillation : " << candidate.oscillationCounter << "\n";
+    }
+}
+
+void describeDecommssioningCandidates(
+  std::ostream& out,
+  const std::map<std::string, Candidate<DecommissioningCandidateType>>& candidates)
+{
+    for (const auto& [candidateName, candidate]: candidates)
+    {
+        out << " Decommissioned capacity for cluster candidate " << candidateName << ": "
+            << candidate.initInstalledCapacity - candidate.installedCapacity
+            << " | remaining : " << candidate.installedCapacity
+            << " | oscillation : " << candidate.oscillationCounter << "\n";
     }
 }
 
@@ -743,8 +758,8 @@ void Balancing::logAreasView() const
         }
         ss << "\n";
 
-        describeCandidates(ss, "Invested", area.investmentCandidates);
-        describeCandidates(ss, "Decommissioned", area.decommissioningCandidates);
+        describeInvestmentCandidates(ss, area.investmentCandidates);
+        describeDecommssioningCandidates(ss, area.decommissioningCandidates);
 
         logMessage(ss.str());
     }
