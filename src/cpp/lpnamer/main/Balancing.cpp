@@ -192,6 +192,11 @@ double reducedIncrement(double currentIncrement, double initialIncrement)
                     currentIncrement - INCREMENT_REDUCTION_RATIO * initialIncrement);
 }
 
+bool minIncrementReached(double currentIncrement, double initialIncrement)
+{
+    return currentIncrement == INCREMENT_REDUCTION_RATIO * initialIncrement;
+}
+
 // ---------------------------------------------------------------------------
 // Criteria
 // ---------------------------------------------------------------------------
@@ -630,13 +635,21 @@ void Balancing::prepareCandidatesToModify(const AreaActions& areaCandidatesToMod
 
         area.lastAction = action;
         computeCandidateInstalledCapacity(action, area, candidateName);
+
         if (isInvestmentAction(action))
         {
-            area.getInvestmentCandidate(candidateName).updateOscillationStatus(action);
+            if (minIncrementReached(area.currentInvestmentIncrement, area.investmentIncrement))
+            {
+                area.getInvestmentCandidate(candidateName).updateOscillationStatus(action);
+            }
         }
         else
         {
-            area.getDecommissioningCandidate(candidateName).updateOscillationStatus(action);
+            if (minIncrementReached(area.currentDecommissioningIncrement,
+                                    area.decommissioningIncrement))
+            {
+                area.getDecommissioningCandidate(candidateName).updateOscillationStatus(action);
+            }
         }
     }
 }

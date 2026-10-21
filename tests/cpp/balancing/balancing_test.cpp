@@ -101,7 +101,7 @@ protected:
     // decommissioning candidate (DECOMMISSIONING / RECOMMISSIONING) matching the action.
     // func must be a generic lambda returning the same type for both candidate types.
     template<typename Func>
-    auto visitCandidate(Balancing& pbg,
+    auto visitCandidate(Balancing& bal,
                         const std::string& areaName,
                         const std::string& candidateName,
                         const CapacityAction& action,
@@ -109,17 +109,17 @@ protected:
     {
         if (isInvestmentAction(action))
         {
-            return func(pbg.getInvestmentCandidate(areaName, candidateName));
+            return func(bal.getInvestmentCandidate(areaName, candidateName));
         }
-        return func(pbg.getDecommissioningCandidate(areaName, candidateName));
+        return func(bal.getDecommissioningCandidate(areaName, candidateName));
     }
 
-    HourlyIndices getDispProdVarIndices(Balancing& pbg,
+    HourlyIndices getDispProdVarIndices(Balancing& bal,
                                         const std::string& areaName,
                                         const std::string& candidateName,
                                         const CapacityAction& action)
     {
-        return visitCandidate(pbg,
+        return visitCandidate(bal,
                               areaName,
                               candidateName,
                               action,
@@ -155,29 +155,29 @@ protected:
         const std::vector<std::string> candidatesName = {"candidate_1", "candidate_2"};
 
         // dummy data, areas are replaced by the real test data below
-        auto pbg = makeProblemGeneration("one_candidate_per_area", makeXpressProblemManager());
+        auto bal = makeProblemGeneration("one_candidate_per_area", makeXpressProblemManager());
 
         // set real test data
         InputBalancingParser balParser(dataTestDir / "find_area_candidate_to_modify"
                                        / "input_balancing.yml");
-        pbg.areas = balParser.parse();
+        bal.areas = balParser.parse();
 
         constexpr double capacity = 1000;
         for (const auto& candidateName: candidatesName)
         {
-            pbg.getInvestmentCandidate("desinvest_area", candidateName).installedCapacity
+            bal.getInvestmentCandidate("desinvest_area", candidateName).installedCapacity
               = capacity;
-            pbg.getDecommissioningCandidate("decom_area", candidateName).installedCapacity
+            bal.getDecommissioningCandidate("decom_area", candidateName).installedCapacity
               = capacity;
-            pbg.getDecommissioningCandidate("recom_area", candidateName).initInstalledCapacity
+            bal.getDecommissioningCandidate("recom_area", candidateName).initInstalledCapacity
               = capacity;
         }
 
         // set area lastAction
-        pbg.areas.at("invest_area").lastAction = CapacityAction::INVESTMENT;
-        pbg.areas.at("desinvest_area").lastAction = CapacityAction::INVESTMENT;
-        pbg.areas.at("decom_area").lastAction = CapacityAction::DECOMMISSIONING;
-        pbg.areas.at("recom_area").lastAction = CapacityAction::DECOMMISSIONING;
+        bal.areas.at("invest_area").lastAction = CapacityAction::INVESTMENT;
+        bal.areas.at("desinvest_area").lastAction = CapacityAction::INVESTMENT;
+        bal.areas.at("decom_area").lastAction = CapacityAction::DECOMMISSIONING;
+        bal.areas.at("recom_area").lastAction = CapacityAction::DECOMMISSIONING;
 
         // set problemManager solution and simulation values:
         // candidate_1 produces 1.0 every hour, candidate_2 produces 0.0
@@ -206,23 +206,23 @@ protected:
                 }
                 if (isInvestmentArea)
                 {
-                    pbg.getInvestmentCandidate(areaName, candidateName).dispProdVarIndices
+                    bal.getInvestmentCandidate(areaName, candidateName).dispProdVarIndices
                       = candidateIndices;
                 }
                 else
                 {
-                    pbg.getDecommissioningCandidate(areaName, candidateName).dispProdVarIndices
+                    bal.getDecommissioningCandidate(areaName, candidateName).dispProdVarIndices
                       = candidateIndices;
                 }
             }
         }
         Antares::Solver::WeeklyProblemId pbId({1, 1});
-        pbg.problemManager->setProblemSolution(pbId, solution);
+        bal.problemManager->setProblemSolution(pbId, solution);
         std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues = {{pbId, pbOutput}};
 
         // run
-        pbg.updateAreaCriteriaData(simuValues);
-        const auto areaCandidatesToModify = pbg.findAreaCandidatesToModify(simuValues);
+        bal.updateAreaCriteriaData(simuValues);
+        const auto areaCandidatesToModify = bal.findAreaCandidatesToModify(simuValues);
 
         // we check that the correct candidate and action have been selected
         const std::map<std::string, std::pair<std::string, CapacityAction>>
@@ -248,7 +248,7 @@ protected:
           {"decom_area", CriterionState::LOWER}};
         for (const auto& [areaName, expectedState]: expectedCriterionStates)
         {
-            EXPECT_EQ(pbg.areas.at(areaName).oldCriterionState, expectedState);
+            EXPECT_EQ(bal.areas.at(areaName).oldCriterionState, expectedState);
         }
     }
 
@@ -261,12 +261,12 @@ protected:
                                     const double expectedUpperCapacity,
                                     const double expectedLowerCapacity)
     {
-        auto pbg = makeProblemGeneration("with_decom_candidate");
-        const auto& problemManager = pbg.problemManager;
+        auto bal = makeProblemGeneration("with_decom_candidate");
+        const auto& problemManager = bal.problemManager;
         const bool isInvestment = isInvestmentAction(action);
 
         // set area increments
-        auto& area = pbg.areas.at(areaName);
+        auto& area = bal.areas.at(areaName);
         area.currentInvestmentIncrement = capacityIncrement;
         if (!isInvestment)
         {
@@ -277,7 +277,7 @@ protected:
         // and higher to allow recommissioning
         const double installedCapacity = (isInvestment ? 6 : 2) * capacityIncrement;
         const double initInstalledCapacity = 4 * capacityIncrement;
-        visitCandidate(pbg,
+        visitCandidate(bal,
                        areaName,
                        candidateName,
                        action,
@@ -296,7 +296,7 @@ protected:
         }
         for (const auto& pbId: problemManager->getProblemIds())
         {
-            visitCandidate(pbg,
+            visitCandidate(bal,
                            areaName,
                            candidateName,
                            action,
@@ -304,7 +304,7 @@ protected:
                            { candidate.setOneWeekBoundsData(pbId, oneWeekBoundData); });
         }
 
-        const HourlyIndices varIndices = getDispProdVarIndices(pbg,
+        const HourlyIndices varIndices = getDispProdVarIndices(bal,
                                                                areaName,
                                                                candidateName,
                                                                action);
@@ -313,11 +313,11 @@ protected:
         // run applyActionToCandidate
         std::map<AreaCandidate, CapacityAction> areaCandidatesToModify = {
           {{areaName, candidateName}, action}};
-        pbg.prepareCandidatesToModify(areaCandidatesToModify);
+        bal.prepareCandidatesToModify(areaCandidatesToModify);
         for (const auto& pbId: problemManager->getProblemIds())
         {
             auto problem = problemManager->getProblemFromId(pbId);
-            pbg.applyActionToCandidate(pbId, problem, areaCandidatesToModify);
+            bal.applyActionToCandidate(pbId, problem, areaCandidatesToModify);
         }
 
         // we check that new bound of candidate have been correctly set
@@ -340,10 +340,10 @@ protected:
         const bool isInvestment = isInvestmentAction(action);
         const std::string candidateName = isInvestment ? "invest_peak2" : "unprofitable_peak";
 
-        auto pbg = makeProblemGeneration("with_decom_candidate", makeXpressProblemManager());
+        auto bal = makeProblemGeneration("with_decom_candidate", makeXpressProblemManager());
 
         // set test data
-        visitCandidate(pbg,
+        visitCandidate(bal,
                        areaName,
                        candidateName,
                        action,
@@ -356,18 +356,18 @@ protected:
         // the cost is named differently for investment and decommissioning candidates
         if (isInvestment)
         {
-            pbg.getInvestmentCandidate(areaName, candidateName).type->investmentCost
+            bal.getInvestmentCandidate(areaName, candidateName).type->investmentCost
               = investmentCost;
         }
         else
         {
-            pbg.getDecommissioningCandidate(areaName, candidateName).type->decommissioningCost
+            bal.getDecommissioningCandidate(areaName, candidateName).type->decommissioningCost
               = investmentCost;
         }
 
         // candidate produces hourlySolutionValue every hour
         std::vector<double> solution(SOLUTION_SIZE, 0.0);
-        for (const auto& idx: getDispProdVarIndices(pbg, areaName, candidateName, action))
+        for (const auto& idx: getDispProdVarIndices(bal, areaName, candidateName, action))
         {
             solution.at(idx) = hourlySolutionValue;
         }
@@ -377,7 +377,7 @@ protected:
         pbOutput.areaPrices[areaName] = areaPrices;
 
         // run
-        auto& area = pbg.areas.at(areaName);
+        auto& area = bal.areas.at(areaName);
         area.initializeRentability(action);
         area.updateRentabilityWithProblem(action, pbOutput, solution);
 
@@ -393,9 +393,9 @@ protected:
         // all capacity data are set at the same value
         constexpr double capacityValue = 1000;
 
-        auto pbg = makeProblemGeneration(studyFolderName);
+        auto bal = makeProblemGeneration(studyFolderName);
 
-        visitCandidate(pbg,
+        visitCandidate(bal,
                        areaName,
                        candidateName,
                        action,
@@ -406,16 +406,16 @@ protected:
                        });
         if (isInvestmentAction(action))
         {
-            pbg.getInvestmentCandidate(areaName, candidateName).type->expansionPotential
+            bal.getInvestmentCandidate(areaName, candidateName).type->expansionPotential
               = capacityValue;
         }
         else
         {
-            pbg.getDecommissioningCandidate(areaName, candidateName).type->decommissioningPotential
+            bal.getDecommissioningCandidate(areaName, candidateName).type->decommissioningPotential
               = capacityValue;
         }
 
-        auto& area = pbg.areas.at(areaName);
+        auto& area = bal.areas.at(areaName);
         area.initializeRentability(action);
 
         // we check that the candidate has been correctly excluded from the selection
@@ -430,20 +430,20 @@ protected:
                                      const std::optional<CapacityAction>& expectedCapacityAction)
     {
         const std::string areaName = "area2";
-        auto pbg = makeProblemGeneration("with_decom_candidate",
+        auto bal = makeProblemGeneration("with_decom_candidate",
                                          std::make_shared<ProblemManager>(),
                                          dataTestDir / "determine_capacity_action"
                                            / "input_balancing.yml");
 
         // set test data
-        auto& investCandidate = pbg.getInvestmentCandidate(areaName, "invest_semibase");
+        auto& investCandidate = bal.getInvestmentCandidate(areaName, "invest_semibase");
         investCandidate.initInstalledCapacity = initInstalledCapacity;
         investCandidate.type->expansionPotential = expansionPotential;
-        auto& decomCandidate = pbg.getDecommissioningCandidate(areaName, "unprofitable_peak");
+        auto& decomCandidate = bal.getDecommissioningCandidate(areaName, "unprofitable_peak");
         decomCandidate.initInstalledCapacity = initInstalledCapacity;
         decomCandidate.type->decommissioningPotential = decommissioningPotential;
 
-        auto& area = pbg.areas.at(areaName);
+        auto& area = bal.areas.at(areaName);
         area.criterionState = criterionState;
         if (previousAreaAction)
         {
@@ -451,31 +451,33 @@ protected:
         }
 
         // we check that the correct action has been selected
-        EXPECT_EQ(pbg.determineCapacityAction(area), expectedCapacityAction);
+        EXPECT_EQ(bal.determineCapacityAction(area), expectedCapacityAction);
     }
 
     void testMaxOscillationReached()
     {
-        auto pbg = makeProblemGeneration("one_candidate_per_area", makeXpressProblemManager());
-        const AreaActions area1InvestmentAction{
-          {{"area1", "invest_peak*1"}, CapacityAction::INVESTMENT},
-        };
-        const AreaActions area1DisinvestmentAction{
-          {{"area1", "invest_peak*1"}, CapacityAction::DISINVESTMENT},
-        };
-        for (int idx = 0; idx < 11; idx++)
+        auto bal = makeProblemGeneration("one_candidate_per_area", makeXpressProblemManager());
+        AreaActions area1Action;
+        Area& area = bal.areas.at("area1");
+        // area.currentInvestmentIncrement = area.investmentIncrement * 0.1;
+        for (int idx = 0; idx < 20; idx++)
         {
-            EXPECT_FALSE(pbg.areas.at("area1").maxOscillationReached());
+            EXPECT_FALSE(bal.areas.at("area1").maxOscillationReached());
             if (idx % 2 == 0)
             {
-                pbg.prepareCandidatesToModify(area1InvestmentAction);
+                area1Action[{"area1", "invest_peak*1"}] = CapacityAction::INVESTMENT;
+                bal.prepareCandidatesToModify(area1Action);
+                area.oldCriterionState = CriterionState::LOWER;
             }
             else
             {
-                pbg.prepareCandidatesToModify(area1DisinvestmentAction);
+                area1Action[{"area1", "invest_peak*1"}] = CapacityAction::DISINVESTMENT;
+                bal.prepareCandidatesToModify(area1Action);
+                area.oldCriterionState = CriterionState::HIGHER;
             }
+            bal.updateAreasIncrement();
         }
-        EXPECT_TRUE(pbg.areas.at("area1").maxOscillationReached());
+        EXPECT_TRUE(bal.areas.at("area1").maxOscillationReached());
     }
 };
 
