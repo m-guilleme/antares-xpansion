@@ -406,13 +406,12 @@ protected:
                        });
         if (isInvestmentAction(action))
         {
-            bal.getInvestmentCandidate(areaName, candidateName).type->expansionPotential
-              = capacityValue;
+            bal.getInvestmentCandidate(areaName, candidateName).type->expansionPotential = 0;
         }
         else
         {
             bal.getDecommissioningCandidate(areaName, candidateName).type->decommissioningPotential
-              = capacityValue;
+              = 0;
         }
 
         auto& area = bal.areas.at(areaName);
@@ -423,6 +422,7 @@ protected:
     }
 
     void testDetermineCapacityAction(const double initInstalledCapacity,
+                                     const double installedCapacity,
                                      const double expansionPotential,
                                      const double decommissioningPotential,
                                      const CriterionState& criterionState,
@@ -438,9 +438,11 @@ protected:
         // set test data
         auto& investCandidate = bal.getInvestmentCandidate(areaName, "invest_semibase");
         investCandidate.initInstalledCapacity = initInstalledCapacity;
+        investCandidate.installedCapacity = installedCapacity;
         investCandidate.type->expansionPotential = expansionPotential;
         auto& decomCandidate = bal.getDecommissioningCandidate(areaName, "unprofitable_peak");
         decomCandidate.initInstalledCapacity = initInstalledCapacity;
+        decomCandidate.installedCapacity = installedCapacity;
         decomCandidate.type->decommissioningPotential = decommissioningPotential;
 
         auto& area = bal.areas.at(areaName);
@@ -616,63 +618,72 @@ TEST_F(BalancingTest, determineCapacityAction)
 
     // isInvestmentCycle TRUE && isHigher TRUE -> Investment
     testDetermineCapacityAction(0,
+                                0,
                                 3000,
                                 0,
                                 CriterionState::HIGHER,
                                 CapacityAction::INVESTMENT,
                                 CapacityAction::INVESTMENT);
     // isInvestmentCycle TRUE && isHigher TRUE && no invest possible -> Recommissioning
-    testDetermineCapacityAction(5500,
-                                2800,
+    testDetermineCapacityAction(3000,
+                                2000,
                                 0,
+                                3000,
                                 CriterionState::HIGHER,
                                 std::nullopt,
                                 CapacityAction::RECOMMISSIONING);
     // isInvestmentCycle TRUE && isHigher FALSE -> Disinvestment
     testDetermineCapacityAction(2500,
-                                0,
+                                5000,
+                                2600,
                                 0,
                                 CriterionState::LOWER,
                                 CapacityAction::INVESTMENT,
                                 CapacityAction::DISINVESTMENT);
     // isInvestmentCycle TRUE && isHigher FALSE && no disinvest possible -> Decommissioning
     testDetermineCapacityAction(2800,
+                                2800,
                                 0,
-                                4500,
+                                2800,
                                 CriterionState::LOWER,
                                 CapacityAction::DISINVESTMENT,
                                 CapacityAction::DECOMMISSIONING);
     // isInvestmentCycle FALSE && isHigher TRUE -> Recommissioning
-    testDetermineCapacityAction(5500,
+    testDetermineCapacityAction(2800,
+                                2000,
                                 0,
-                                0,
+                                2800,
                                 CriterionState::HIGHER,
                                 CapacityAction::DECOMMISSIONING,
                                 CapacityAction::RECOMMISSIONING);
     // isInvestmentCycle FALSE && isHigher TRUE && no recom possible -> Investment
     testDetermineCapacityAction(5000,
+                                5000,
                                 3000,
                                 0,
                                 CriterionState::HIGHER,
                                 CapacityAction::RECOMMISSIONING,
                                 CapacityAction::INVESTMENT);
     // isInvestmentCycle FALSE && isHigher FALSE -> Decommissioning
-    testDetermineCapacityAction(0,
+    testDetermineCapacityAction(3000,
+                                3000,
                                 0,
-                                4500,
+                                3000,
                                 CriterionState::LOWER,
                                 CapacityAction::DECOMMISSIONING,
                                 CapacityAction::DECOMMISSIONING);
     // isInvestmentCycle FALSE && isHigher TRUE && no decom possible -> DISINVESTMENT
-    testDetermineCapacityAction(2500,
-                                0,
+    testDetermineCapacityAction(3000,
                                 5000,
+                                2500,
+                                3000,
                                 CriterionState::LOWER,
                                 std::nullopt,
                                 CapacityAction::DISINVESTMENT);
     // no action available
     testDetermineCapacityAction(5000,
-                                2800,
+                                5000,
+                                0,
                                 0,
                                 CriterionState::HIGHER,
                                 CapacityAction::INVESTMENT,

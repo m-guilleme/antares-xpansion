@@ -60,7 +60,7 @@ struct InvestmentCandidateType
 {
     double derating, expansionPotential, investmentCost, fixedOmCosts;
 
-    double maxCapacity() const
+    double potential() const
     {
         return expansionPotential;
     }
@@ -76,9 +76,9 @@ struct DecommissioningCandidateType
     double decommissioningPotential, decommissioningCost = 0., fixedOmCosts;
     int units;
 
-    double maxCapacity() const
+    double potential() const
     {
-        return decommissioningPotential;
+        return -decommissioningPotential;
     }
 
     double unitCost() const

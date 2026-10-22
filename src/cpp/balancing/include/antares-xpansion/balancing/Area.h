@@ -84,6 +84,9 @@ public:
                                       const PbOutput pbOutput,
                                       const std::vector<double> solution);
 
+    /// @brief Check decom candidates type against capacities retrieve from problems
+    void checkDecomCandidatesTypeAgainstDecomCandidateCapacities() const;
+
     /// @brief Get the criterion value above which the area is considered not balanced
     /// @return The higher threshold, derived from the reliability standard and its dead band
     double higherThreshold() const;

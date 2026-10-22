@@ -9,8 +9,9 @@ void Area::initializeRentabilityImpl(const std::map<std::string, Candidate<T>>& 
     {
         const bool reachingPotential = action == CapacityAction::INVESTMENT
                                        || action == CapacityAction::DECOMMISSIONING;
-        const double limit = reachingPotential ? candidate.type->maxCapacity()
-                                               : candidate.initInstalledCapacity;
+        const double limit = reachingPotential
+                               ? candidate.initInstalledCapacity + candidate.type->potential()
+                               : candidate.initInstalledCapacity;
         if (candidate.installedCapacity == limit)
         {
             continue;
@@ -55,9 +56,13 @@ Candidate<DecommissioningCandidateType>& Area::getDecommissioningCandidate(
 bool Area::isInvestmentPossible() const
 {
     return std::ranges::any_of(investmentCandidates,
-                               [](const auto& entry) {
+                               [](const auto& entry)
+                               {
                                    return entry.second.installedCapacity
-                                          < entry.second.type->expansionPotential;
+                                            < entry.second.initInstalledCapacity
+                                                + entry.second.type->expansionPotential
+                                          && entry.second.installedCapacity
+                                               >= entry.second.initInstalledCapacity;
                                });
 }
 
@@ -67,7 +72,10 @@ bool Area::isDecommissioningPossible() const
                                [this](const auto& entry)
                                {
                                    return entry.second.installedCapacity
-                                            > entry.second.type->decommissioningPotential
+                                            > entry.second.initInstalledCapacity
+                                                - entry.second.type->decommissioningPotential
+                                          && entry.second.installedCapacity
+                                               <= entry.second.initInstalledCapacity
                                           && currentDecommissioningIncrement
                                                >= entry.second.initInstalledCapacity
                                                     / entry.second.type->units;
@@ -189,4 +197,17 @@ double Area::lowerThreshold() const
 double Area::higherThreshold() const
 {
     return reliabilityStandard + reliabilityStandardDeadBandUp;
+}
+
+void Area::checkDecomCandidatesTypeAgainstDecomCandidateCapacities() const
+{
+    for (const auto& [candidateName, candidate]: decommissioningCandidates)
+    {
+        if (candidate.installedCapacity - candidate.type->decommissioningPotential < 0)
+        {
+            throw std::runtime_error("Decommissioning potential is superior to the initial "
+                                     "installed capacity of candidate "
+                                     + candidateName);
+        }
+    }
 }

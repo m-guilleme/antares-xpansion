@@ -64,6 +64,9 @@ private:
     /// @brief Update the capacities of every candidate from its bounds data
     void updateCandidatesCapacities();
 
+    /// @brief Check inputs balancing against candidates capacity data
+    void checkInputsBalancing();
+
     // --- Candidates access ---------------------------------------------------
 
     /// @brief Get an investment candidate of an area

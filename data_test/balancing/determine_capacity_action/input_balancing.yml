@@ -20,7 +20,7 @@ decommissioning_candidates_types:
     decommissioning_cost: 0
     units: 50
     fixed_om_costs: 1000
-    decommissioning_potential: 0
+    decommissioning_potential: 5000
 
 investment_candidates_types:
   semibase_type:
