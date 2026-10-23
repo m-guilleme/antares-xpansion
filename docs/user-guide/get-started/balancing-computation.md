@@ -55,10 +55,13 @@ areas:
 decommissioning_candidates_types:
   # name of the decommissioning type
   decom_type:
-    # decommmissioning potential that's limit the invested capacity to decommssion
+    # decommmissioning potential that's limit the decommissioned capacity
+    # limit installed capacity = initial installed capacity - decommssioning_potential
     decommissioning_potential: 0.0
     # initial cost of decommissioning/recommssioning action
     decommissioning_cost: 10000
+    # number of units in the cluster
+    units: 4
     # fixed cost of action
     fixed_om_costs: 1000
 # investment cluster candidate types
@@ -66,7 +69,8 @@ investment_candidates_types:
   # name of the investment type
   semibase_type:
     derating: 0.0
-    # expansion potential which limits the invested capacity to investment
+    # expansion potential that's limit the invested capacity
+    # limit installed capacity = initial installed capacity + expansion_potential
     expansion_potential: 4000
     # cost of investment/desinvestment action
     investment_cost: 126000
@@ -129,10 +133,13 @@ This file is expected to be located at `<study_root>/user/balancing/settings.yml
 
 ## Outputs
 
-The outputs are three files: **final_capacities.csv**, **iterations_values_log.csv**, and **final_criteria.csv**.
+The outputs are several files: **main_balancing_logs.txt**,**x_balancing_logs.txt**, **final_capacities.csv**, **iterations_values_log.csv**, and **final_criteria.csv**.
 
 Outputted files consist of: 
 
+- main log files of the balancing run `main_balancing_log.txt`;
+- thread specific log files of the balancing run `x_balancing_log.txt`;
+  - ex: `0_balancing_log.txt`contains the log from the first thread
 - a comma-separated values file named `final_capacities.csv`;
   - contains for each candidate cluster of each area their final balanced invested capacity and the capacity change from initial invested capacity ;
 - a comma-separated values file named `iterations_values_log.csv`;

@@ -19,7 +19,7 @@ MultithreadTBBLogger::MultithreadTBBLogger(const std::filesystem::path& logFolde
     // also assuming that nbThreads is not greater than the maximum hardware concurrency
     // otherwise will create empty log files
     int threadId = 0;
-    const auto filePath = _logFolder / (std::to_string(threadId) + "_" + _logFileName);
+    const auto filePath = _logFolder / ("main_" + _logFileName);
     auto loggerFactory = FileAndStdoutLoggerFactory(filePath, false);
     _loggers.emplace(threadId,
                      std::make_shared<FilteredLogger>(loggerFactory.get_logger(), _verbosity));
