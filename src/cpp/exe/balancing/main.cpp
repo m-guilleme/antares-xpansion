@@ -23,7 +23,6 @@ namespace
 {
 constexpr const char* SETTINGS_FILE = "user/balancing/settings.yml";
 constexpr const char* INPUT_BALANCING_FILE = "user/balancing/input_balancing.yml";
-constexpr const char* LOG_SUB_FOLDER = "balancing_logs";
 constexpr const char* LOG_FILENAME = "balancing_log.txt";
 constexpr const char* INITIAL_PROBLEMS_FOLDER = "initial_problems";
 
@@ -55,7 +54,7 @@ LoggerPtr createLogger(const std::filesystem::path& simulationDir,
                        int nbThreads,
                        const std::string& verbosity)
 {
-    const auto logDir = simulationDir / LOG_SUB_FOLDER;
+    const auto logDir = simulationDir / balancing::LOG_SUB_FOLDER;
     std::filesystem::create_directories(logDir);
     return std::make_shared<MultithreadTBBLogger>(logDir,
                                                   LOG_FILENAME,

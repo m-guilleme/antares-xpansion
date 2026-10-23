@@ -848,9 +848,12 @@ void Balancing::saveAreasViewToCSV(const std::filesystem::path& outputPath) cons
 
 void Balancing::run(int maxIterations, GreedyBalancingFinder& gbf)
 {
-    const auto iterationsLogFilePath = directories.simulation_dir / ITERATIONS_LOG_FILE;
-    const auto finalCriteriaFilePath = directories.simulation_dir / FINAL_CRITERIA_FILE;
-    const auto finalCapacitiesFilePath = directories.simulation_dir / FINAL_CAPACITIES_FILE;
+    const auto iterationsLogFilePath = directories.simulation_dir / balancing::LOG_SUB_FOLDER
+                                       / ITERATIONS_LOG_FILE;
+    const auto finalCriteriaFilePath = directories.simulation_dir / balancing::LOG_SUB_FOLDER
+                                       / FINAL_CRITERIA_FILE;
+    const auto finalCapacitiesFilePath = directories.simulation_dir / balancing::LOG_SUB_FOLDER
+                                         / FINAL_CAPACITIES_FILE;
 
     const auto logRun = [this](const std::string& message)
     { logger->display_message(message, LogUtils::LOGLEVEL::INFO, logger->CONTEXT); };

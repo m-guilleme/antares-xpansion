@@ -19,6 +19,11 @@ using AreaCandidate = std::pair<std::string, std::string>;
 using AreaActions = std::map<AreaCandidate, CapacityAction>;
 using SimuValues = std::map<Antares::Solver::WeeklyProblemId, PbOutput>;
 
+namespace balancing
+{
+inline constexpr const char* LOG_SUB_FOLDER = "balancing_logs";
+}
+
 class Balancing: public ProblemGenerationOptimSimu
 {
 public:

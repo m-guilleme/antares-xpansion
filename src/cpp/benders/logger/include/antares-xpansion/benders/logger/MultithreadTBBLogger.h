@@ -66,7 +66,9 @@ public:
 
 private:
     std::map<int, Logger>
-      _loggers;         /// the collection of all loggers, 0 being used for single thread logging
-    int _nbThreads = 1; /// the maximum number of threads
+      _loggers; /// the collection of all loggers, 0 being used for single thread logging
+    std::filesystem::path _logFolder;
+    std::string _logFileName;
+    int _nbThreads = 1;                                       /// the maximum number of threads
     LogUtils::LOGLEVEL _verbosity = LogUtils::LOGLEVEL::INFO; /// the lowest desired verbosity
 };

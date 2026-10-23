@@ -9,26 +9,27 @@ MultithreadTBBLogger::MultithreadTBBLogger(const std::filesystem::path& logFolde
                                            const std::string& logFileName,
                                            int nbThreads,
                                            std::optional<LogUtils::LOGLEVEL> verbosity):
-    _nbThreads(nbThreads)
+    _nbThreads(nbThreads),
+    _logFolder(logFolder),
+    _logFileName(logFileName)
 {
     _verbosity = verbosity.value_or(LogUtils::LOGLEVEL::INFO);
     // defaulting to FilteredLogger loggers for threads
     // assuming thread ids range from 0 to nbThreads - 1;
     // also assuming that nbThreads is not greater than the maximum hardware concurrency
     // otherwise will create empty log files
-    for (int threadId = 0; threadId < _nbThreads; ++threadId)
-    {
-        const auto filePath = logFolder / (std::to_string(threadId) + "_" + logFileName);
-        auto loggerFactory = FileAndStdoutLoggerFactory(filePath, false);
-        _loggers.emplace(threadId,
-                         std::make_shared<FilteredLogger>(loggerFactory.get_logger(), _verbosity));
-    }
+    int threadId = 0;
+    const auto filePath = _logFolder / (std::to_string(threadId) + "_" + _logFileName);
+    auto loggerFactory = FileAndStdoutLoggerFactory(filePath, false);
+    _loggers.emplace(threadId,
+                     std::make_shared<FilteredLogger>(loggerFactory.get_logger(), _verbosity));
 
-    if (!std::filesystem::exists(logFolder))
+    if (!std::filesystem::exists(_logFolder))
     {
         _loggers.at(0)->display_message(
-          "Folder for multithread log files did not exist, it is created at " + logFolder.string());
-        std::filesystem::create_directories(logFolder);
+          "Folder for multithread log files did not exist, it is created at "
+          + _logFolder.string());
+        std::filesystem::create_directories(_logFolder);
     }
 }
 
@@ -42,8 +43,16 @@ void MultithreadTBBLogger::display_message(const std::string& str)
     // this is the TBB-dependent part, which could be improved with an additional layer of
     // abstraction
     int threadId = tbb::this_task_arena::current_thread_index();
-    if (threadId != tbb::task_arena::not_initialized && _loggers.count(threadId))
+    if (threadId != tbb::task_arena::not_initialized)
     {
+        if (!_loggers.count(threadId))
+        {
+            const auto filePath = _logFolder / (std::to_string(threadId) + "_" + _logFileName);
+            auto loggerFactory = FileAndStdoutLoggerFactory(filePath, false);
+            _loggers.emplace(threadId,
+                             std::make_shared<FilteredLogger>(loggerFactory.get_logger(),
+                                                              _verbosity));
+        }
         _loggers.at(threadId)->display_message(str);
     }
     else
@@ -59,8 +68,16 @@ void MultithreadTBBLogger::display_message(const std::string& str,
     // this is the TBB-dependent part, which could be improved with an additional layer of
     // abstraction
     int threadId = tbb::this_task_arena::current_thread_index();
-    if (threadId != tbb::task_arena::not_initialized && _loggers.count(threadId))
+    if (threadId != tbb::task_arena::not_initialized && level == _verbosity)
     {
+        if (!_loggers.count(threadId))
+        {
+            const auto filePath = _logFolder / (std::to_string(threadId) + "_" + _logFileName);
+            auto loggerFactory = FileAndStdoutLoggerFactory(filePath, false);
+            _loggers.emplace(threadId,
+                             std::make_shared<FilteredLogger>(loggerFactory.get_logger(),
+                                                              _verbosity));
+        }
         _loggers.at(threadId)->display_message(str, level, context);
     }
     else
