@@ -502,6 +502,7 @@ void Balancing::updateAreaCriteriaData(const SimuValues& simuValues)
     {
         const double average = averageCriteria.at(areaName);
         area.avgCriteria = average;
+        area.oldCriterionState = area.criterionState;
         area.criterionState = computeCriterionState(area, average);
     }
 }
@@ -518,14 +519,6 @@ void Balancing::updateAreasIncrement()
               area.currentDecommissioningIncrement,
               area.decommissioningIncrement);
         }
-    }
-}
-
-void Balancing::updateOldCriterionState()
-{
-    for (auto& area: areas | std::views::values)
-    {
-        area.oldCriterionState = area.criterionState;
     }
 }
 
@@ -599,7 +592,6 @@ AreaActions Balancing::findAreaCandidatesToModify(const SimuValues& simuValues)
         areaCandidatesToModify[{areaName, candidateName}] = action;
     }
 
-    updateOldCriterionState();
     return areaCandidatesToModify;
 }
 
@@ -866,13 +858,14 @@ void Balancing::run(int maxIterations, GreedyBalancingFinder& gbf)
     int iteration = -1;
     const auto startBalancingProcess = std::chrono::steady_clock::now();
     logMessage("Starting balancing process");
-    logAreasView();
 
     while (!isBalanced() && iteration < maxIterations)
     {
         ++iteration;
         const auto startIteration = std::chrono::steady_clock::now();
         logRun("Iteration " + std::to_string(iteration));
+
+        logAreasView();
 
         // simuValues is empty on the first iteration: nothing to modify yet
         const AreaActions areaCandidatesToModify = simuValues.empty()
@@ -890,8 +883,6 @@ void Balancing::run(int maxIterations, GreedyBalancingFinder& gbf)
 
         saveIterativeAreasViewToCSV(iteration, iterationsLogFilePath);
         updateAreaCriteriaData(simuValues);
-        logAreasView();
-
         const std::chrono::duration<double> iterationDuration = endIteration - startIteration;
         logRun("Elapsed time for iteration " + std::to_string(iteration) + ": "
                + formatDuration(iterationDuration));

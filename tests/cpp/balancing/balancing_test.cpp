@@ -223,6 +223,8 @@ protected:
         // run
         bal.updateAreaCriteriaData(simuValues);
         const auto areaCandidatesToModify = bal.findAreaCandidatesToModify(simuValues);
+        // run updateAreaCriteriaData a second to update each oldCriterionState
+        bal.updateAreaCriteriaData(simuValues);
 
         // we check that the correct candidate and action have been selected
         const std::map<std::string, std::pair<std::string, CapacityAction>>

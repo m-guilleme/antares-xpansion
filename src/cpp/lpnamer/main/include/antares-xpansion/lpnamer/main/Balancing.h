@@ -114,9 +114,6 @@ private:
     /// @brief Reduce the current increments of the areas whose criterion state has changed
     void updateAreasIncrement();
 
-    /// @brief Set the old criterion state of every area to its current criterion state
-    void updateOldCriterionState();
-
     // --- Choosing and applying actions ---------------------------------------
 
     /// @brief Find the action to apply to an area from its criterion state and previous action

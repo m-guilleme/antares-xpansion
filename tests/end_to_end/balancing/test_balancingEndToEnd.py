@@ -95,10 +95,10 @@ def run_balancing_test(install_dir, study, rel_std_indicator: str, tmp_path: Pat
     study_dir = prepare_study_data(Path(study["path"]), rel_std_indicator, tmp_path)
     run_balancing(install_dir, study_dir)
 
-    run_dir = find_run_directory(study_dir / "output")
+    run_dir = find_run_directory(study_dir / "output" )
     ref_dir = study_dir / rel_std_indicator
     for output_name, ref_name in OUTPUT_TO_REF.items():
-        compare_csv_to_ref(run_dir / output_name, ref_dir / ref_name)
+        compare_csv_to_ref(run_dir / "balancing_logs" / output_name , ref_dir / ref_name)
 
 
 @study_cases
