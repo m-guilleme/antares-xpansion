@@ -1,6 +1,7 @@
 add_subdirectory(cpp)
 
 set(BENDERS $<TARGET_FILE_NAME:benders>)
+set(BALANCING $<TARGET_FILE_NAME:balancing>)
 
 if (COIN_OR)
     SET(AVAILABLE_SOLVER_YML_LIST "${AVAILABLE_SOLVER_YML_LIST}- Cbc\n")

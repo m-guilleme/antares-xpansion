@@ -1,0 +1,40 @@
+# ===========================================================================
+# CMake configuration
+# ===========================================================================
+
+# ===========================================================================
+# Targets
+# ===========================================================================
+
+find_package(yaml-cpp CONFIG REQUIRED)
+
+add_library(balancing_lib STATIC)
+
+target_sources(balancing_lib PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/InputBalancingParser.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/SettingsConfigReader.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Candidate.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Area.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/InputBalancingParser.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/SettingsConfigReader.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/Candidate.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/Area.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/balancing/utils.h
+)
+
+target_link_libraries(balancing_lib
+        PUBLIC
+        antaresXpansion::evaluator_lib
+        antaresXpansion::helpers
+        antaresXpansion::config_reader_lib
+)
+
+target_include_directories(balancing_lib
+        PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+
+add_library(${PROJECT_NAME}::balancing_lib ALIAS balancing_lib)
+install(DIRECTORY include/antares-xpansion
+        DESTINATION "include"
+)

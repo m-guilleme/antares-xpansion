@@ -1,0 +1,237 @@
+#include "include/antares-xpansion/balancing/InputBalancingParser.h"
+
+InputBalancingParser::InputBalancingParser(const std::filesystem::path& pathToYamlConfigFile):
+    pathToYamlConfigFile(pathToYamlConfigFile),
+    defaultReliabilityStandardDeadBandUp(0.0),
+    defaultReliabilityStandardDeadBandDown(0.0)
+{
+    if (!pathToYamlConfigFile.empty())
+    {
+        if (!std::filesystem::exists(pathToYamlConfigFile))
+        {
+            throw std::runtime_error("YAML config file does not exist: "
+                                     + pathToYamlConfigFile.string());
+        }
+    }
+}
+
+std::map<std::string, Area> InputBalancingParser::parse()
+{
+    try
+    {
+        config = YAML::LoadFile(pathToYamlConfigFile.string());
+
+        parseGlobalSettings();
+        parseDecommissioningCandidatesTypes();
+        parseInvestmentCandidatesTypes();
+        parseAreas();
+        return areas;
+    }
+    catch (const YAML::Exception& e)
+    {
+        throw std::runtime_error("YAML parsing error: " + std::string(e.what()));
+    }
+}
+
+/// @brief Throws if a required YAML field is missing, with a descriptive message
+template<typename T>
+static T requireField(const YAML::Node& node, const std::string& field, const std::string& context)
+{
+    const YAML::Node value = node[field];
+    if (!value)
+    {
+        throw std::runtime_error("Missing '" + field + "' for " + context);
+    }
+    return value.as<T>();
+}
+
+template<typename T>
+static void optionalField(const YAML::Node& node, const std::string& field, T& parameter)
+{
+    const YAML::Node value = node[field];
+    if (value)
+    {
+        parameter = value.as<T>();
+    }
+}
+
+void InputBalancingParser::parseGlobalSettings()
+{
+    if (config["reliability_standard_dead_band_up"])
+    {
+        defaultReliabilityStandardDeadBandUp = config["reliability_standard_dead_band_up"]
+                                                 .as<double>();
+    }
+
+    if (config["reliability_standard_dead_band_down"])
+    {
+        defaultReliabilityStandardDeadBandDown = config["reliability_standard_dead_band_down"]
+                                                   .as<double>();
+    }
+
+    if (config["reliability_standard_indicator"])
+    {
+        auto criterionStr = config["reliability_standard_indicator"].as<std::string>();
+        if (criterionStr == "UNSP_ENERG")
+        {
+            reliabilityStandardIndicator = Benders::Criterion::Type::UnsuppliedEnergy;
+        }
+        else if (criterionStr == "LOLE")
+        {
+            reliabilityStandardIndicator = Benders::Criterion::Type::LossOfLoadExpectation;
+        }
+        else if (criterionStr == "NPCAP_HOURS")
+        {
+            reliabilityStandardIndicator = Benders::Criterion::Type::NearPriceCapHours;
+        }
+        else
+        {
+            throw std::runtime_error(
+              "YAML parsing error: " + criterionStr
+              + " is not a correct reliabilityStandardIndicator (LOLE or NPCAP_HOURS)");
+        }
+    }
+}
+
+void InputBalancingParser::parseDecommissioningCandidatesTypes()
+{
+    if (!config["decommissioning_candidates_types"])
+    {
+        return;
+    }
+
+    for (const auto& typeNode: config["decommissioning_candidates_types"])
+    {
+        std::string typeName = typeNode.first.as<std::string>();
+        YAML::Node typeData = typeNode.second;
+        const std::string context = "decommissioning candidate of type: " + typeName;
+        auto type = std::make_shared<DecommissioningCandidateType>();
+        type->fixedOmCosts = requireField<double>(typeData, "fixed_om_costs", context);
+        type->decommissioningPotential = requireField<double>(typeData,
+                                                              "decommissioning_potential",
+                                                              context);
+        optionalField(typeData, "decommissioning_cost", type->decommissioningCost);
+        type->units = requireField<double>(typeData, "units", context);
+        decommissioningCandidatesTypes[typeName] = std::move(type);
+    }
+}
+
+void InputBalancingParser::parseInvestmentCandidatesTypes()
+{
+    if (!config["investment_candidates_types"])
+    {
+        return;
+    }
+
+    for (const auto& typeNode: config["investment_candidates_types"])
+    {
+        std::string typeName = typeNode.first.as<std::string>();
+        YAML::Node typeData = typeNode.second;
+        const std::string context = "investment candidate of type: " + typeName;
+        auto type = std::make_shared<InvestmentCandidateType>();
+        type->derating = requireField<double>(typeData, "derating", context);
+        type->expansionPotential = requireField<double>(typeData, "expansion_potential", context);
+        type->investmentCost = requireField<double>(typeData, "investment_cost", context);
+        type->fixedOmCosts = requireField<double>(typeData, "fixed_om_costs", context);
+        investmentCandidatesTypes[typeName] = std::move(type);
+    }
+}
+
+/// @brief Parse a mapping of candidate names to their type from a YAML area node, and populate
+///        the target map with the resolved type data.
+/// @param areaData    YAML node representing a single area's configuration.
+/// @param yamlKey     Key under @p areaData that holds the candidate-to-type mapping.
+/// @param candidateTypes Registry mapping type name strings to their shared parameter objects,
+///                     used to resolve each candidate's type.
+/// @param label       Human-readable category label (e.g. "investment", "decommissioning"),
+///                    used in error messages.
+/// @param areaName    Name of the area being parsed, used in error messages.
+/// @param candidates   Destination map to populate, keyed by candidate name.
+///
+/// @throws std::runtime_error If a candidate references a type name not found in @p typeRegistry.
+template<typename T>
+static void parseCandidatesToType(const YAML::Node& areaData,
+                                  const std::string& yamlKey,
+                                  const std::map<std::string, std::shared_ptr<T>>& candidateTypes,
+                                  const std::string& label,
+                                  const std::string& areaName,
+                                  std::map<std::string, Candidate<T>>& candidates)
+{
+    const std::string context = label + " candidate of type: " + yamlKey;
+    YAML::Node areaNode = areaData[yamlKey];
+    if (!areaNode)
+    {
+        throw std::runtime_error("Missing '" + yamlKey + "' for " + context);
+    }
+
+    for (const auto& candidate: areaNode)
+    {
+        std::string candidateName = candidate.first.as<std::string>();
+        std::replace(candidateName.begin(), candidateName.end(), ' ', '*');
+        const std::string typeName = candidate.second.as<std::string>();
+
+        auto it = candidateTypes.find(typeName);
+        if (it == candidateTypes.end())
+        {
+            throw std::runtime_error("Unknown " + label + " type '" + typeName + "' for candidate '"
+                                     + candidateName + "' in area '" + areaName + "'");
+        }
+        candidates.insert_or_assign(candidateName, Candidate<T>(it->second));
+    }
+}
+
+void InputBalancingParser::parseAreas()
+{
+    if (!config["areas"])
+    {
+        return;
+    }
+
+    for (const auto& areaNode: config["areas"])
+    {
+        std::string areaName = areaNode.first.as<std::string>();
+        YAML::Node areaData = areaNode.second;
+        const std::string context = "area: " + areaName;
+
+        Area area;
+        area.name = areaName;
+        area.reliabilityStandard = requireField<double>(areaData, "reliability_standard", context);
+        area.decommissioningIncrement = requireField<double>(areaData,
+                                                             "decommissioning_increment",
+                                                             context);
+        area.currentDecommissioningIncrement = area.decommissioningIncrement;
+        area.investmentIncrement = requireField<double>(areaData, "investment_increment", context);
+        area.currentInvestmentIncrement = area.investmentIncrement;
+        optionalField(areaData, "max_oscillation", area.maxOscillation);
+        area.reliabilityStandardDeadBandUp = areaData["reliability_standard_dead_band_up"]
+                                               ? areaData["reliability_standard_dead_band_up"]
+                                                   .as<double>()
+                                               : defaultReliabilityStandardDeadBandUp;
+
+        area.reliabilityStandardDeadBandDown = areaData["reliability_standard_dead_band_down"]
+                                                 ? areaData["reliability_standard_dead_band_down"]
+                                                     .as<double>()
+                                                 : defaultReliabilityStandardDeadBandDown;
+
+        parseCandidatesToType(areaData,
+                              "decommissioning_candidates_to_type",
+                              decommissioningCandidatesTypes,
+                              "decommissioning",
+                              areaName,
+                              area.decommissioningCandidates);
+
+        parseCandidatesToType(areaData,
+                              "investment_candidates_to_type",
+                              investmentCandidatesTypes,
+                              "investment",
+                              areaName,
+                              area.investmentCandidates);
+
+        areas[areaName] = std::move(area);
+    }
+}
+
+Benders::Criterion::Type InputBalancingParser::getReliabilityStandardIndicator() const
+{
+    return reliabilityStandardIndicator;
+}

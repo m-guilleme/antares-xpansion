@@ -1,0 +1,4 @@
+solver: xpress
+verbosity: INFO
+cache_problems: false
+max_iterations: 30

@@ -130,7 +130,6 @@ ProblemGenerationForWaterValueCalculation::cleanProblemsForBellmanCalculations(
       problems.end(),
       [&](auto& pbId)
       {
-          //   auto pbId = pb.first;
           if (startWeek <= pbId.week && pbId.week <= endWeek)
           {
               // copy of the problem needed if gridCollection contains multiple
@@ -146,13 +145,11 @@ ProblemGenerationForWaterValueCalculation::cleanProblemsForBellmanCalculations(
                                       logger->CONTEXT);
               {
                   std::lock_guard<std::mutex> lock(mapMutex);
-                  //   modifiedProblems[pbId] = problem;
                   modifiedProblemManager->setProblem(pbId, problem);
               }
           }
       });
 
-    // return modifiedProblems;
     return modifiedProblemManager;
 }
 
