@@ -78,7 +78,7 @@ struct DecommissioningCandidateType
 
     double potential() const
     {
-        return -decommissioningPotential;
+        return decommissioningPotential;
     }
 
     double unitCost() const

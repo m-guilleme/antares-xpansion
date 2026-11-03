@@ -606,8 +606,7 @@ void Balancing::computeCandidateInstalledCapacity(CapacityAction action,
         auto& candidate = area.getInvestmentCandidate(candidateName);
         candidate.installedCapacity = std::min(candidate.installedCapacity
                                                  + area.currentInvestmentIncrement,
-                                               candidate.installedCapacity
-                                                 + candidate.type->expansionPotential);
+                                               candidate.type->expansionPotential);
         break;
     }
     case CapacityAction::DISINVESTMENT:
@@ -621,8 +620,7 @@ void Balancing::computeCandidateInstalledCapacity(CapacityAction action,
     case CapacityAction::DECOMMISSIONING:
     {
         auto& candidate = area.getDecommissioningCandidate(candidateName);
-        const double lowerLimit = candidate.initInstalledCapacity
-                                  - candidate.type->decommissioningPotential;
+        const double lowerLimit = candidate.type->decommissioningPotential;
         const double target = candidate.installedCapacity - area.currentDecommissioningIncrement;
         const double unitCapacity = candidate.initInstalledCapacity / candidate.type->units;
         const double unitsCount = std::max(target, lowerLimit) / unitCapacity;
