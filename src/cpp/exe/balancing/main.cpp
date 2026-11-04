@@ -47,7 +47,7 @@ int clampThreadCount(int requested)
 
 void logInfo(const LoggerPtr& logger, const std::string& message)
 {
-    logger->display_message(message, LogUtils::LOGLEVEL::INFO, logger->CONTEXT);
+    logger->display_message(message, LogUtils::LOGLEVEL::INFO, PROBLEM_GENERATION_LOGGER_CONTEXT);
 }
 
 LoggerPtr createLogger(const std::filesystem::path& simulationDir,

@@ -72,10 +72,7 @@ bool Area::isDecommissioningPossible() const
                                    return entry.second.installedCapacity
                                             > entry.second.type->decommissioningPotential
                                           && entry.second.installedCapacity
-                                               <= entry.second.initInstalledCapacity
-                                          && currentDecommissioningIncrement
-                                               >= entry.second.initInstalledCapacity
-                                                    / entry.second.type->units;
+                                               <= entry.second.initInstalledCapacity;
                                });
 }
 

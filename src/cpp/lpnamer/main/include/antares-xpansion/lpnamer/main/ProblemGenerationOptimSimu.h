@@ -1,7 +1,3 @@
-//
-// Created by marechaljas on 27/10/23.
-//
-
 #pragma once
 
 #include <antares/solver/lps/LpsFromAntares.h>
