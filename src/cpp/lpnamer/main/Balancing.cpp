@@ -368,11 +368,23 @@ Balancing::Balancing(ConfigurationManager::ConfigDirectories directories,
     areas(std::move(areas))
 {
     logMessage("Get candidates indices and marginal cost");
+    const auto startFillDispProdVarInd = std::chrono::steady_clock::now();
     fillDispProdVarIndicesAndMarginalCosts();
+    const std::chrono::duration<double>
+      durationFillDispProdVarInd = std::chrono::steady_clock::now() - startFillDispProdVarInd;
+    logMessage("Duration: " + formatDuration(durationFillDispProdVarInd));
     logMessage("Get candidate bounds data");
+    const auto startSetCapacity = std::chrono::steady_clock::now();
     setCapacitiesDataForCandidates();
+    const std::chrono::duration<double> durationSetCapacity = std::chrono::steady_clock::now()
+                                                              - startSetCapacity;
+    logMessage("Duration: " + formatDuration(durationSetCapacity));
     logMessage("Check inputs against candidate capacity");
+    const auto startCheckInputsBalancing = std::chrono::steady_clock::now();
     checkInputsBalancing();
+    const std::chrono::duration<double>
+      durationCheckInputsBalancing = std::chrono::steady_clock::now() - startCheckInputsBalancing;
+    logMessage("Duration: " + formatDuration(durationCheckInputsBalancing));
 }
 
 void Balancing::fillDispProdVarIndicesAndMarginalCosts()
@@ -557,10 +569,16 @@ std::optional<CapacityAction> Balancing::determineCapacityAction(const Area& are
 
 AreaActions Balancing::findAreaCandidatesToModify(const SimuValues& simuValues)
 {
-    logMessage("Find areas candidate to modify");
+    logMessage("Update areas increment");
+    const auto startUpdateAreasIncrement = std::chrono::steady_clock::now();
     areasAction.clear();
     updateAreasIncrement();
+    const std::chrono::duration<double>
+      durationUpdateAreasIncrement = std::chrono::steady_clock::now() - startUpdateAreasIncrement;
+    logMessage("Duration: " + formatDuration(durationUpdateAreasIncrement));
 
+    logMessage("Determine action per area");
+    const auto startDetermineCapacityAction = std::chrono::steady_clock::now();
     for (auto& [areaName, area]: areas)
     {
         if (area.criterionState == CriterionState::VALID)
@@ -574,7 +592,13 @@ AreaActions Balancing::findAreaCandidatesToModify(const SimuValues& simuValues)
             area.initializeRentability(action.value());
         }
     }
+    const std::chrono::duration<double>
+      durationDetermineCapacityAction = std::chrono::steady_clock::now()
+                                        - startDetermineCapacityAction;
+    logMessage("Duration: " + formatDuration(durationDetermineCapacityAction));
 
+    logMessage("Compute rentability per candidates for each area");
+    const auto startUpdateRentability = std::chrono::steady_clock::now();
     for (const auto& [pbId, pbOutput]: simuValues)
     {
         const std::vector<double> solution = problemManager->getProblemSolution(pbId);
@@ -583,7 +607,12 @@ AreaActions Balancing::findAreaCandidatesToModify(const SimuValues& simuValues)
             areas.at(areaName).updateRentabilityWithProblem(action, pbOutput, solution);
         }
     }
+    const std::chrono::duration<double> durationUpdateRentability = std::chrono::steady_clock::now()
+                                                                    - startUpdateRentability;
+    logMessage("Duration: " + formatDuration(durationUpdateRentability));
 
+    logMessage("Select candidates with best rentability");
+    const auto startSelectBestCandidate = std::chrono::steady_clock::now();
     AreaActions areaCandidatesToModify;
     for (const auto& [areaName, action]: areasAction)
     {
@@ -591,6 +620,9 @@ AreaActions Balancing::findAreaCandidatesToModify(const SimuValues& simuValues)
           action);
         areaCandidatesToModify[{areaName, candidateName}] = action;
     }
+    const std::chrono::duration<double>
+      durationSelectBestCandidate = std::chrono::steady_clock::now() - startSelectBestCandidate;
+    logMessage("Duration: " + formatDuration(durationSelectBestCandidate));
 
     return areaCandidatesToModify;
 }
@@ -674,26 +706,28 @@ void Balancing::applyCapacityActions(const AreaActions& areaCandidatesToModify)
     {
         return;
     }
-    logMessage("Apply action");
-
+    logMessage("Update installed capacity and oscillation status of selected candidate");
+    const auto startPrepareCandidate = std::chrono::steady_clock::now();
     std::map<AreaCandidate, double> previousCapacities;
     for (const auto& [areaCandidate, action]: areaCandidatesToModify)
     {
         previousCapacities[areaCandidate] = getCandidateCurrentCapacity(action, areaCandidate);
     }
-
     prepareCandidatesToModify(areaCandidatesToModify);
-
     for (const auto& [areaCandidate, action]: areaCandidatesToModify)
     {
         logMessage(describeAction(areaCandidate, action, previousCapacities.at(areaCandidate)));
     }
+    const std::chrono::duration<double> durationPrepareCandidate = std::chrono::steady_clock::now()
+                                                                   - startPrepareCandidate;
+    logMessage("Duration: " + formatDuration(durationPrepareCandidate));
 }
 
 void Balancing::applyActionToCandidate(Antares::Solver::WeeklyProblemId pbId,
                                        const std::shared_ptr<Problem>& problem,
                                        const AreaActions& areaCandidatesToModify)
 {
+    const auto startApplyAction = std::chrono::steady_clock::now();
     CandidatesBoundsChange cBoundsChange(areaCandidatesToModify.size());
     for (const auto& [areaCandidate, action]: areaCandidatesToModify)
     {
@@ -709,7 +743,11 @@ void Balancing::applyActionToCandidate(Antares::Solver::WeeklyProblemId pbId,
         }
     }
     problem->chg_bounds(cBoundsChange.varIndices, cBoundsChange.boundTypes, cBoundsChange.values);
-    problemManager->setProblem(pbId, problem);
+    // problemManager->setProblem(pbId, problem);
+    const std::chrono::duration<double> durationApplyAction = std::chrono::steady_clock::now()
+                                                              - startApplyAction;
+    logMessage("Apply action " + problemName(pbId)
+               + ". Duration: " + formatDuration(durationApplyAction));
 }
 
 SimuValues Balancing::solveAndComputeCriterionAndPrice(const AreaActions& areaCandidatesToModify,
@@ -873,6 +911,8 @@ void Balancing::run(int maxIterations, GreedyBalancingFinder& gbf)
         }
 
         applyCapacityActions(areaCandidatesToModify);
+
+        logMessage("Solve and compute price criterion");
         simuValues = solveAndComputeCriterionAndPrice(areaCandidatesToModify, gbf);
         const auto endIteration = std::chrono::steady_clock::now();
 
