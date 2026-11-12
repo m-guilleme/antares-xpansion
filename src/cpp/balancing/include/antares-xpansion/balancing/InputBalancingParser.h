@@ -26,7 +26,6 @@ public:
     Benders::Criterion::Type getReliabilityStandardIndicator() const;
 
 private:
-    std::map<std::string, Area> areas;
     std::filesystem::path pathToYamlConfigFile;
     YAML::Node config;
     double defaultReliabilityStandardDeadBandUp;
@@ -40,9 +39,10 @@ private:
     void parseGlobalSettings();
     /// @brief Parse the areas from the YAML configuration file : reliability standard,
     /// decommissioning and investment increments, candidates to type mapping
-    void parseAreas();
+    std::map<std::string, Area> parseAreas();
     /// @brief Parse the decommissioning candidates types from the YAML configuration file : fixed
     /// O&M costs
+    /// @return The map of the areas data
     void parseDecommissioningCandidatesTypes();
     /// @brief Parse the investment candidates types from the YAML configuration file : derating,
     /// expansion potential, investment cost and fixed O&M costs

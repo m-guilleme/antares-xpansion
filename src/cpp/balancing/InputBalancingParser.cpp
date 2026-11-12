@@ -24,8 +24,7 @@ std::map<std::string, Area> InputBalancingParser::parse()
         parseGlobalSettings();
         parseDecommissioningCandidatesTypes();
         parseInvestmentCandidatesTypes();
-        parseAreas();
-        return areas;
+        return parseAreas();
     }
     catch (const YAML::Exception& e)
     {
@@ -180,13 +179,14 @@ static void parseCandidatesToType(const YAML::Node& areaData,
     }
 }
 
-void InputBalancingParser::parseAreas()
+std::map<std::string, Area> InputBalancingParser::parseAreas()
 {
     if (!config["areas"])
     {
-        return;
+        throw std::runtime_error("Missing areas definition in the inputs balancing");
     }
 
+    std::map<std::string, Area> areas;
     for (const auto& areaNode: config["areas"])
     {
         std::string areaName = areaNode.first.as<std::string>();
@@ -226,9 +226,9 @@ void InputBalancingParser::parseAreas()
                               "investment",
                               areaName,
                               area.investmentCandidates);
-
         areas[areaName] = std::move(area);
     }
+    return areas;
 }
 
 Benders::Criterion::Type InputBalancingParser::getReliabilityStandardIndicator() const
