@@ -74,15 +74,15 @@ public:
     /// @brief Select the candidate with the best rentability for an action
     /// @param action The capacity action to select a candidate for
     /// @return The name of the candidate with the best rentability
-    std::string selectCandidateWithBestRentability(CapacityAction action);
+    std::string selectCandidateWithBestRentability(const CapacityAction& action);
 
     /// @brief Update the candidates rentability with the results of one problem
     /// @param action The capacity action the rentability is computed for
     /// @param pbOutput The criterion values and prices computed for the problem
     /// @param solution The solution of the problem
-    void updateRentabilityWithProblem(const CapacityAction action,
-                                      const PbOutput pbOutput,
-                                      const std::vector<double> solution);
+    void updateRentabilityWithProblem(const CapacityAction& action,
+                                      const PbOutput& pbOutput,
+                                      const std::vector<double>& solution);
 
     /// @brief Check decom candidates type against capacities retrieve from problems
     void checkDecomCandidatesTypeAgainstDecomCandidateCapacities() const;
@@ -105,9 +105,9 @@ private:
     /// @param solution The solution of the problem
     template<typename T>
     void computeRentabilityForCandidates(const std::map<std::string, Candidate<T>>& candidates,
-                                         const CapacityAction action,
-                                         const PbOutput pbOutput,
-                                         const std::vector<double> solution);
+                                         const CapacityAction& action,
+                                         const PbOutput& pbOutput,
+                                         const std::vector<double>& solution);
 
     /// @brief Compute the extra cost of the rentability of a candidate
     /// @param candidate The candidate to compute the extra cost for

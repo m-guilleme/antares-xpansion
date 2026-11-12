@@ -122,9 +122,9 @@ double Area::extraCost(const Candidate<T>& candidate)
     return candidate.installedCapacity * candidate.type->unitCost();
 }
 
-void Area::updateRentabilityWithProblem(const CapacityAction action,
-                                        const PbOutput pbOutput,
-                                        const std::vector<double> solution)
+void Area::updateRentabilityWithProblem(const CapacityAction& action,
+                                        const PbOutput& pbOutput,
+                                        const std::vector<double>& solution)
 {
     const bool isInvestmentAction = action == CapacityAction::INVESTMENT
                                     || action == CapacityAction::DISINVESTMENT;
@@ -140,9 +140,9 @@ void Area::updateRentabilityWithProblem(const CapacityAction action,
 
 template<typename T>
 void Area::computeRentabilityForCandidates(const std::map<std::string, Candidate<T>>& candidates,
-                                           const CapacityAction action,
-                                           const PbOutput pbOutput,
-                                           const std::vector<double> solution)
+                                           const CapacityAction& action,
+                                           const PbOutput& pbOutput,
+                                           const std::vector<double>& solution)
 {
     for (auto& [candidateName, rentability]: candidatesRentability)
     {
@@ -159,12 +159,12 @@ void Area::computeRentabilityForCandidates(const std::map<std::string, Candidate
     }
 }
 
-static bool shouldSelectMaxRentability(CapacityAction action)
+static bool shouldSelectMaxRentability(const CapacityAction& action)
 {
     return action == CapacityAction::INVESTMENT || action == CapacityAction::RECOMMISSIONING;
 }
 
-std::string Area::selectCandidateWithBestRentability(CapacityAction action)
+std::string Area::selectCandidateWithBestRentability(const CapacityAction& action)
 {
     const auto valueOf = [](const auto& entry) { return entry.second; };
     const auto best = shouldSelectMaxRentability(action)
