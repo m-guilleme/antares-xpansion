@@ -1,0 +1,14 @@
+iteration,zone,criteria,action,cluster candidate,capacity change
+1,area1,HIGHER,INVESTMENT,invest_peak*1,500
+1,area2,HIGHER,INVESTMENT,invest_semibase*1,500
+2,area1,HIGHER,INVESTMENT,invest_peak*1,500
+2,area2,HIGHER,INVESTMENT,invest_semibase*1,500
+3,area2,LOWER,DISINVESTMENT,invest_semibase*1,-450
+4,area1,HIGHER,INVESTMENT,invest_peak*1,450
+4,area2,HIGHER,INVESTMENT,invest_semibase*1,400
+5,area2,LOWER,DISINVESTMENT,invest_semibase*1,-350
+6,area2,LOWER,DISINVESTMENT,invest_semibase*1,-350
+7,area1,HIGHER,INVESTMENT,invest_peak*1,400
+7,area2,HIGHER,INVESTMENT,invest_semibase*1,300
+8,area2,LOWER,DISINVESTMENT,invest_semibase*1,-250
+9,area2,LOWER,DISINVESTMENT,invest_semibase*1,-250

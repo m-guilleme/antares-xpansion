@@ -2,13 +2,11 @@
 #include "antares-xpansion/evaluator/Evaluator.h"
 
 #include <fmt/core.h>
-#include <regex>
 #include <sstream>
 #include <tbb/global_control.h>
 #include <tbb/parallel_for_each.h>
 #include <utility>
 
-#include "antares-xpansion/benders/benders_core/BendersProblemFromFile.h"
 #include "antares-xpansion/helpers/Timer.h"
 
 using namespace PlainData;
@@ -76,7 +74,7 @@ void Evaluator::Run()
                                                         << yearWeekId.year << " week "
                                                         << yearWeekId.week)
                                                          .str(),
-                                                       LogUtils::LOGLEVEL::INFO,
+                                                       LogUtils::LOGLEVEL::DEBUG,
                                                        EVALUATOR_LOGGER_CONTEXT);
                                auto subPb = problemManager->getProblemFromId(yearWeekId);
                                ProcessSubproblem(yearWeekId, subPb);
@@ -104,6 +102,11 @@ SubProblemData Evaluator::SolveSubproblem(std::shared_ptr<Problem> problem)
         logger->display_message("File saved at: " + studyDir.string(),
                                 LogUtils::LOGLEVEL::ERR,
                                 EVALUATOR_LOGGER_CONTEXT);
+    }
+    else
+    {
+        std::lock_guard solutionGuard(solutionMutex);
+        problemManager->storeProblemSolution(problem);
     }
     subPbData.subproblem_cost = problem->get_lp_value();
     logger->display_message("Calculated cost for year " + std::to_string(problem->mc_year)

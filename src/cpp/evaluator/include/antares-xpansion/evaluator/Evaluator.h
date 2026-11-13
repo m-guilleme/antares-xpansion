@@ -40,7 +40,8 @@ protected:
     Logger logger;
     std::shared_ptr<ProblemManager> problemManager; ///< problemManager holding all subproblems,
                                                     ///< either in memory or streamed from files
-    std::string solverName;                         ///< Solver name
+    mutable std::mutex solutionMutex; ///< a mutex for storing solutions to a map in problemManager
+    std::string solverName;           ///< Solver name
     std::filesystem::path studyDir; ///< Path to the study, used to save MPS files in case of error
 
     int nbThreads; ///< Number of threads to use

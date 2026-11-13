@@ -1,7 +1,3 @@
-//
-// Created by marechaljas on 27/10/23.
-//
-
 #pragma once
 
 #include <antares/solver/lps/LpsFromAntares.h>
@@ -13,6 +9,8 @@ namespace Antares::Solver
 {
 class SingleProblemGetter;
 }
+
+constexpr char PROBLEM_GENERATION_LOGGER_CONTEXT[] = "ProblemGeneration";
 
 /// @brief Class to generate and modify problems in memory
 class ProblemGenerationOptimSimu

@@ -42,7 +42,7 @@ Note that steps 1 and 2 are performed only once and reused for all reservoirs.
 
 - an **Antares study**
 - a grid defined by a **grid.csv** file located at `<study_root>/user/water_values/grid.csv`
-- two secondary input files **settings.yaml** and **dynamic_programming.yaml** holding various user-set parameters related to technical settings and simulation settings respectively. These files are optional, and expected at `<study_root>/user/water_values/`
+- two secondary input files **settings.yml** and **dynamic_programming.yml** holding various user-set parameters related to technical settings and simulation settings respectively. These files are optional, and expected at `<study_root>/user/water_values/`
 
 ## Input file grid.csv
 
@@ -79,13 +79,13 @@ Water values can also be computed for multiple areas/reservoirs, which need to b
 
 In this case, water values will be **computed sequentially**, in the order in which areas are defined in grid.csv.
 
-By default, optimal trajectories are not computed, and default trajectories are used instead, in the form of natural inflows. It is possible to compute optimal trajectories along with water values, and to take the optimal trajectory of a reservoir into account when calculating  water values of subsequent areas, with use of the `use_optimal_trajectory` value from `settings.yaml` (see below). In this case, given that water values are computed for all areas sequentially, in the order they are defined in grid.csv, water values for any given area will be computed by **using optimal trajectories of all previous areas**.
+By default, optimal trajectories are not computed, and default trajectories are used instead, in the form of natural inflows. It is possible to compute optimal trajectories along with water values, and to take the optimal trajectory of a reservoir into account when calculating  water values of subsequent areas, with use of the `use_optimal_trajectory` value from `settings.yml` (see below). In this case, given that water values are computed for all areas sequentially, in the order they are defined in grid.csv, water values for any given area will be computed by **using optimal trajectories of all previous areas**.
 
 It is not currently possible to compute water values for multiple areas sharing the same grid_id, in a use case referred to as _multivariate_.
 
-### Secondary input file: dynamic_programming.yaml
+### Secondary input file: dynamic_programming.yml
 
-Here is an example of a **dynamic_programming.yaml** file, that defines parameters related to general simulation parameters, dynamic programming, Bellman values and penalties when computing water values:
+Here is an example of a **dynamic_programming.yml** file, that defines parameters related to general simulation parameters, dynamic programming, Bellman values and penalties when computing water values:
 
 ```yaml
 # All parameters related to dynamic programming and penalties when computing water values.
@@ -144,13 +144,13 @@ penalties:
     # will be restricted to [0.0 ; 1.0]
 ```
 
-This file is expected to be located at `<study_root>/user/water_values/dynamic_programming.yaml`. It is optional, however default values are hard-coded in the program.
+This file is expected to be located at `<study_root>/user/water_values/dynamic_programming.yml`. It is optional, however default values are hard-coded in the program.
 
 Values related to penalties are to be specified by area. If an area is present in grid.csv but not in this YAML file, or if some parameters are not present for a zone, default values will be used. The example above covers that case: all values are specified for `area1`, some of them for `area2`, and none for `area3`.
 
-### Secondary input file: settings.yaml
+### Secondary input file: settings.yml
 
-Here is an example of a **settings.yaml** file, that defines parameters related to general, technical settings when computing water values:
+Here is an example of a **settings.yml** file, that defines parameters related to general, technical settings when computing water values:
 
 ```yaml
 # All parameters related to general settings when computing water values.
@@ -187,20 +187,18 @@ cache_problems : true
 # default: false
 ```
 
-This file is expected to be located at `<study_root>/user/water_values/settings.yaml`. It is optional, however default values are hard-coded in the program.
+This file is expected to be located at `<study_root>/user/water_values/settings.yml`. It is optional, however default values are hard-coded in the program.
 
 ## Outputs
 
-The outputs are the **Bellman values**, **water values**, and **optimal trajectories** (if requested by setting `use_optimal_trajectory` to true in `dynamic_programming.yaml`, see above) for all specified weeks (see parameters `start_week` and `end_week` above) discretized over the specified number of levels of stock (see parameters `nb_levels` above) for all areas in `grid.csv`.
+The outputs are the **Bellman values**, **water values**, and **optimal trajectories** (if requested by setting `use_optimal_trajectory` to true in `dynamic_programming.yml`, see above) for all specified weeks (see parameters `start_week` and `end_week` above) discretized over the specified number of levels of stock (see parameters `nb_levels` above) for all areas in `grid.csv`.
 
 Outputted files consist of:
 
-- a comma-separated values file named `[grid_id]_[area]_costs.csv`;
-- a comma-separated values file named `[grid_id]_[area]_bellman_values.csv`;
-- a comma-separated values file named `[grid_id]_[area]_water_values.csv`;
-- if requested, a comma-separated values file named `[grid_id]_[area]_optimal_trajectory.csv`.
+- a comma-separated values file named `iterations_values_log.csv`;
+- a comma-separated values file named `final_values_log.txt`.
 
-These files will be created in a timecoded folder located at `<study_root>/output/<YYYYMMDD-hhmm>eco/`. This folder will hold all output files produced by the program, including problem files in the MPS or SVF format if requested (see parameters `keep_mps` and `problem_format` in `settings.yaml` above).
+These files will be created in a timecoded folder located at `<study_root>/output/<YYYYMMDD-hhmm>eco/`. This folder will hold all output files produced by the program, including problem files in the MPS or SVF format if requested (see parameters `keep_mps` and `problem_format` in `settings.yml` above).
 
 ## Command line usage
 

@@ -1,7 +1,9 @@
 #pragma once
 
+#include "ConstraintsGroup.h"
 #include "CriterionInputDataReader.h"
 #include "VariablesGroup.h"
+#include "antares-xpansion/multisolver_interface/SolverAbstract.h"
 
 namespace Benders::Criterion
 {
@@ -38,25 +40,37 @@ public:
     void SearchVariables(const std::vector<std::string>& variables);
 
     /**
+     * @brief Searches for relevant constraints based on the provided constraint
+     * names.
+     *
+     * This method initializes a VariablesGroup with the provided constraint names
+     * and retrieves the indices of these constraints for later computation.
+     *
+     * @param constraints A vector of strings representing the constraint names to
+     * search for.
+     */
+    void SearchConstraints(const std::vector<std::string>& constraints);
+
+    /**
      * @brief Computes the  criteria based on subproblem solutions.
      *
      * This method calculates the criterion criteria and pattern values
      * based on the provided subproblem weight and solution. It updates the
      * criteria and patterns values vectors accordingly.
      *
+     * @param problem The already solved problem
      * @param subproblem_weight The weight of the subproblem affecting the
      * criteria.
-     * @param sub_problem_solution A vector containing the solutions of the
-     * subproblem.
      * @param criteria A reference to a vector where the computed
      * criteria will be stored.
      * @param patterns_values A reference to a vector where the computed
      * pattern values will be stored.
      */
-    void ComputeCriterion(double subproblem_weight,
-                          const std::vector<double>& sub_problem_solution,
-                          std::vector<double>& criteria,
-                          std::vector<double>& patterns_values);
+    virtual void ComputeCriterion(std::shared_ptr<SolverAbstract> problem,
+                                  double subproblem_weight,
+                                  std::vector<double>& criteria,
+                                  std::vector<double>& patterns_values)
+      = 0;
 
     /**
      * @brief Retrieves the variable indices.
@@ -66,7 +80,7 @@ public:
      *
      * @return A reference to the vector of variable indices.
      */
-    std::vector<std::vector<int>>& getVarIndices();
+    std::vector<std::vector<int>>& getIndices();
 
     /**
      * @brief Retrieves the criterion input data.
@@ -83,8 +97,12 @@ public:
         return criterion_input_data_.Criteria().empty();
     }
 
-private:
-    std::vector<std::vector<int>> var_indices_ = {};
+    void SetCriterionCountThreshold(double count_threshold);
+
+    virtual ~CriterionComputation() = default;
+
+protected:
+    std::vector<std::vector<int>> indices_ = {};
     CriterionInputData criterion_input_data_;
 };
 } // namespace Benders::Criterion

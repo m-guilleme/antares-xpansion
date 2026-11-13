@@ -13,7 +13,7 @@ ProblemManager::ProblemManager(const std::string& solverName,
     solverFactory_()
 {
     setProblemFormat(problemsFormatFromString(problemFormat));
-    if (cacheProblems && problemsPath == std::nullopt)
+    if ((cacheProblems || writePbFiles) && problemsPath == std::nullopt)
     {
         throw std::runtime_error(
           "Error: trying to stream problems from disk without specifying a folder.");
@@ -50,7 +50,7 @@ void ProblemManager::setProblems(
   std::map<Antares::Solver::WeeklyProblemId, std::shared_ptr<Problem>>& problems)
 {
     problems_.clear();
-    problemIds.clear();
+    problemIds_.clear();
 
     for (auto& [pbId, problem]: problems)
     {
@@ -91,6 +91,18 @@ std::shared_ptr<Problem> ProblemManager::readProblemFromDisk(const std::string& 
                               + std::string(e.what());
         throw std::runtime_error(message);
     }
+}
+
+std::vector<double> ProblemManager::getProblemSolution(
+  const Antares::Solver::WeeklyProblemId& pbId) const
+{
+    const auto& solution = solutions_.find(pbId);
+    if (solution != solutions_.end())
+    {
+        return solution->second;
+    }
+    throw std::runtime_error("No solution was found in memory for problem "
+                             + getPbNameFromId(pbId));
 }
 
 void ProblemManager::saveProblemToFile(const Antares::Solver::WeeklyProblemId& pbId,

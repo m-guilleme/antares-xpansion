@@ -138,6 +138,40 @@ private:
     mutable std::mutex mutex;
 
 public:
+    ConcurrentInsertionMap() = default;
+
+    ConcurrentInsertionMap(const ConcurrentInsertionMap& other)
+    {
+        std::lock_guard<std::mutex> lock(other.mutex);
+        map = other.map;
+    }
+
+    ConcurrentInsertionMap(ConcurrentInsertionMap&& other) noexcept
+    {
+        std::lock_guard<std::mutex> lock(other.mutex);
+        map = std::move(other.map);
+    }
+
+    ConcurrentInsertionMap& operator=(const ConcurrentInsertionMap& other)
+    {
+        if (this != &other)
+        {
+            std::scoped_lock lock(mutex, other.mutex);
+            map = other.map;
+        }
+        return *this;
+    }
+
+    ConcurrentInsertionMap& operator=(ConcurrentInsertionMap&& other) noexcept
+    {
+        if (this != &other)
+        {
+            std::scoped_lock lock(mutex, other.mutex);
+            map = std::move(other.map);
+        }
+        return *this;
+    }
+
     // Insert a key-value pair into the map
     void insert(const Key& key, const Value& value)
     {
