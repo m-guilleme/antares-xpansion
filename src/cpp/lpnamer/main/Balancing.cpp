@@ -567,6 +567,28 @@ std::optional<CapacityAction> Balancing::determineCapacityAction(const Area& are
     return std::nullopt;
 }
 
+void Balancing::computeAllCandidatesRentability(const SimuValues& simuValues)
+{
+    tbb::parallel_for_each(
+      problemManager->getProblemIds(),
+      [&](const auto& pbId)
+      {
+          PbOutput pbOutput = simuValues.at(pbId);
+          const std::vector<double> solution = problemManager->getProblemSolution(pbId);
+          for (const auto& [areaName, action]: areasAction)
+          {
+              areas.at(areaName).updateCandidatesRentabilityPerProblem(action,
+                                                                       pbId,
+                                                                       pbOutput,
+                                                                       solution);
+          }
+      });
+    for (const auto& [areaName, action]: areasAction)
+    {
+        areas.at(areaName).computeCandidatesRentability(action);
+    }
+}
+
 AreaActions Balancing::findAreaCandidatesToModify(const SimuValues& simuValues)
 {
     logMessage("Update areas increment");
@@ -599,14 +621,7 @@ AreaActions Balancing::findAreaCandidatesToModify(const SimuValues& simuValues)
 
     logMessage("Compute rentability per candidates for each area");
     const auto startUpdateRentability = std::chrono::steady_clock::now();
-    for (const auto& [pbId, pbOutput]: simuValues)
-    {
-        const std::vector<double> solution = problemManager->getProblemSolution(pbId);
-        for (const auto& [areaName, action]: areasAction)
-        {
-            areas.at(areaName).updateRentabilityWithProblem(action, pbOutput, solution);
-        }
-    }
+    computeAllCandidatesRentability(simuValues);
     const std::chrono::duration<double> durationUpdateRentability = std::chrono::steady_clock::now()
                                                                     - startUpdateRentability;
     logMessage("Duration: " + formatDuration(durationUpdateRentability));
@@ -727,7 +742,6 @@ void Balancing::applyActionToCandidate(Antares::Solver::WeeklyProblemId pbId,
                                        const std::shared_ptr<Problem>& problem,
                                        const AreaActions& areaCandidatesToModify)
 {
-    const auto startApplyAction = std::chrono::steady_clock::now();
     CandidatesBoundsChange cBoundsChange(areaCandidatesToModify.size());
     for (const auto& [areaCandidate, action]: areaCandidatesToModify)
     {
@@ -743,11 +757,6 @@ void Balancing::applyActionToCandidate(Antares::Solver::WeeklyProblemId pbId,
         }
     }
     problem->chg_bounds(cBoundsChange.varIndices, cBoundsChange.boundTypes, cBoundsChange.values);
-    // problemManager->setProblem(pbId, problem);
-    const std::chrono::duration<double> durationApplyAction = std::chrono::steady_clock::now()
-                                                              - startApplyAction;
-    logMessage("Apply action " + problemName(pbId)
-               + ". Duration: " + formatDuration(durationApplyAction));
 }
 
 SimuValues Balancing::solveAndComputeCriterionAndPrice(const AreaActions& areaCandidatesToModify,
@@ -856,9 +865,9 @@ void Balancing::saveCandidatesResultsToCSV(const std::filesystem::path& outputPa
 void Balancing::saveAreasViewToCSV(const std::filesystem::path& outputPath) const
 {
     auto file = openForWriting(outputPath);
-    file
-      << "area,last avg criteria,criteria target,criteria lower bound,criteria upper bound,status,"
-         "total capacity change\n";
+    file << "area,last avg criteria,criteria target,criteria lower bound,criteria upper "
+            "bound,status,"
+            "total capacity change\n";
     for (const auto& [areaName, area]: areas)
     {
         file << areaName << "," << area.avgCriteria << "," << area.reliabilityStandard << ","

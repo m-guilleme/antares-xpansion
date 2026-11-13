@@ -169,6 +169,8 @@ protected:
               = capacity;
             bal.getDecommissioningCandidate("decom_area", candidateName).installedCapacity
               = capacity;
+            bal.getDecommissioningCandidate("decom_area", candidateName).initInstalledCapacity
+              = capacity;
             bal.getDecommissioningCandidate("recom_area", candidateName).initInstalledCapacity
               = capacity;
         }
@@ -185,8 +187,8 @@ protected:
                                      * candidatesName.size());
         PbOutput pbOutput;
         pbOutput.areaCriterionValues = {{"invest_area", 5},
-                                        {"desinvest_area", 2},
-                                        {"decom_area", 2},
+                                        {"desinvest_area", 0},
+                                        {"decom_area", 0},
                                         {"recom_area", 5}};
         std::array<double, NUMBER_OF_HOURS_PER_WEEK> areaPrices;
         areaPrices.fill(1.0);
@@ -216,9 +218,13 @@ protected:
                 }
             }
         }
-        Antares::Solver::WeeklyProblemId pbId({1, 1});
-        bal.problemManager->setProblemSolution(pbId, solution);
-        std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues = {{pbId, pbOutput}};
+
+        std::map<Antares::Solver::WeeklyProblemId, PbOutput> simuValues;
+        for (auto& pbId: bal.problemManager->getProblemIds())
+        {
+            simuValues[pbId] = pbOutput;
+            bal.problemManager->setProblemSolution(pbId, solution);
+        }
 
         // run
         bal.updateAreaCriteriaData(simuValues);
@@ -381,7 +387,8 @@ protected:
         // run
         auto& area = bal.areas.at(areaName);
         area.initializeRentability(action);
-        area.updateRentabilityWithProblem(action, pbOutput, solution);
+        area.updateCandidatesRentabilityPerProblem(action, {1, 1}, pbOutput, solution);
+        area.computeCandidatesRentability(action);
 
         // we check that the rentability have been correctly computed
         EXPECT_DOUBLE_EQ(area.getCandidatesRentability().at(candidateName), expectedRentability);

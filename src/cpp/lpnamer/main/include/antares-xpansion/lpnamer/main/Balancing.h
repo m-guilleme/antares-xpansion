@@ -121,6 +121,10 @@ private:
     /// @return The action to apply, or nothing if no action is possible
     std::optional<CapacityAction> determineCapacityAction(const Area& area) const;
 
+    /// @brief Compute rentability of all candidates
+    /// @param simuValues The simulation values to use to select the candidates
+    void computeAllCandidatesRentability(const SimuValues& simuValues);
+
     /// @brief Find the action to apply for each area candidate
     /// @param simuValues The simulation values to use to select the candidates
     /// @return A map associating each selected area candidate to its action

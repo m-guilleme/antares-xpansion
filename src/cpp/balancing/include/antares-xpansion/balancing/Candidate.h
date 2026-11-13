@@ -6,6 +6,7 @@
 #include <antares/api/solver.h>
 
 #include "antares-xpansion/benders/benders_core/CriterionInputDataReader.h"
+#include "antares-xpansion/evaluator/Evaluator.h"
 #include "antares-xpansion/lpnamer/model/Problem.h"
 
 constexpr int NUMBER_OF_HOURS_PER_WEEK = 168;
@@ -102,12 +103,13 @@ struct CandidateBase
     int oscillationCounter = 0;
     std::array<size_t, NUMBER_OF_HOURS_PER_WEEK> dispProdVarIndices;
     std::map<Antares::Solver::WeeklyProblemId, std::vector<BoundData>> boundsData;
+    Output::ConcurrentInsertionMap<Antares::Solver::WeeklyProblemId, double> rentabilityPerProblem;
 
     /// @brief Set the bounds data of one week problem
     /// @param pbId The id of the weekly problem
     /// @param oneWeekBoundsData The hourly bounds data of the week
-    void setOneWeekBoundsData(Antares::Solver::WeeklyProblemId pbId,
-                              std::vector<BoundData> oneWeekBoundsData);
+    void setOneWeekBoundsData(const Antares::Solver::WeeklyProblemId& pbId,
+                              const std::vector<BoundData>& oneWeekBoundsData);
 
     /// @brief Update the oscillation status of the candidate after an action has been applied
     /// @param action The action applied to the candidate
@@ -120,11 +122,23 @@ struct CandidateBase
     /// @brief Compute the bounds data of one week problem and store it
     /// @param pbId The id of the weekly problem
     /// @param problem The weekly problem to compute the bounds data from
-    void computeAndSetOneWeekCapacityData(Antares::Solver::WeeklyProblemId pbId,
+    void computeAndSetOneWeekCapacityData(const Antares::Solver::WeeklyProblemId& pbId,
                                           const std::shared_ptr<Problem>& problem);
 
     /// @brief Update the candidate capacities from the computed bounds data
     void updateCapacitiesFromBounds();
+
+    /// @brief Update candidate rentability for one problem
+    /// @param pbId The id of the weekly problem
+    /// @param areaPrices Area prices from the problem output
+    /// @param solution Solution of the problem
+    void updateRentabilityWithProblem(
+      const Antares::Solver::WeeklyProblemId& pbIb,
+      const std::array<double, NUMBER_OF_HOURS_PER_WEEK>& areaPrices,
+      const std::vector<double>& solution);
+
+    /// @brief Compute the rentability of the candidate
+    double computeRentability();
 };
 
 template<typename T>

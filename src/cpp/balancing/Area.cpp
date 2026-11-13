@@ -122,40 +122,62 @@ double Area::extraCost(const Candidate<T>& candidate)
     return candidate.installedCapacity * candidate.type->unitCost();
 }
 
-void Area::updateRentabilityWithProblem(const CapacityAction& action,
-                                        const PbOutput& pbOutput,
-                                        const std::vector<double>& solution)
+void Area::updateCandidatesRentabilityPerProblem(const CapacityAction& action,
+                                                 const Antares::Solver::WeeklyProblemId& pbId,
+                                                 const PbOutput& pbOutput,
+                                                 const std::vector<double>& solution)
 {
     const bool isInvestmentAction = action == CapacityAction::INVESTMENT
                                     || action == CapacityAction::DISINVESTMENT;
     if (isInvestmentAction)
     {
-        computeRentabilityForCandidates(investmentCandidates, action, pbOutput, solution);
+        updateActionCandidatesRentabilityPerProblem(investmentCandidates, pbId, pbOutput, solution);
     }
     else
     {
-        computeRentabilityForCandidates(decommissioningCandidates, action, pbOutput, solution);
+        updateActionCandidatesRentabilityPerProblem(decommissioningCandidates,
+                                                    pbId,
+                                                    pbOutput,
+                                                    solution);
     }
 }
 
 template<typename T>
-void Area::computeRentabilityForCandidates(const std::map<std::string, Candidate<T>>& candidates,
-                                           const CapacityAction& action,
-                                           const PbOutput& pbOutput,
-                                           const std::vector<double>& solution)
+void Area::updateActionCandidatesRentabilityPerProblem(
+  std::map<std::string, Candidate<T>>& candidates,
+  const Antares::Solver::WeeklyProblemId& pbId,
+  const PbOutput& pbOutput,
+  const std::vector<double>& solution)
+{
+    const std::array<double, NUMBER_OF_HOURS_PER_WEEK>& areaPrices = pbOutput.areaPrices.at(name);
+    for (auto& [candidateName, rentability]: candidatesRentability)
+    {
+        Candidate<T>& candidate = candidates.at(candidateName);
+        candidate.updateRentabilityWithProblem(pbId, areaPrices, solution);
+    }
+}
+
+void Area::computeCandidatesRentability(const CapacityAction& action)
+{
+    const bool isInvestmentAction = action == CapacityAction::INVESTMENT
+                                    || action == CapacityAction::DISINVESTMENT;
+    if (isInvestmentAction)
+    {
+        computeActionCandidatesRentability(investmentCandidates);
+    }
+    else
+    {
+        computeActionCandidatesRentability(decommissioningCandidates);
+    }
+}
+
+template<typename T>
+void Area::computeActionCandidatesRentability(std::map<std::string, Candidate<T>>& candidates)
 {
     for (auto& [candidateName, rentability]: candidatesRentability)
     {
-        double production(0.0);
-        Candidate<T> candidate = candidates.at(candidateName);
-        double marginalCost = candidate.marginalCost;
-        const auto& dispProdVarIndices = candidate.dispProdVarIndices;
-
-        for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
-        {
-            production = solution.at(dispProdVarIndices.at(hour));
-            rentability += (pbOutput.areaPrices.at(name).at(hour) - marginalCost) * production;
-        }
+        Candidate<T>& candidate = candidates.at(candidateName);
+        rentability += candidate.computeRentability();
     }
 }
 

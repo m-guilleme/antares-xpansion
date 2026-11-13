@@ -1,7 +1,7 @@
 #include "include/antares-xpansion/balancing/Area.h"
 
-void CandidateBase::setOneWeekBoundsData(Antares::Solver::WeeklyProblemId pbId,
-                                         std::vector<BoundData> oneWeekBoundsData)
+void CandidateBase::setOneWeekBoundsData(const Antares::Solver::WeeklyProblemId& pbId,
+                                         const std::vector<BoundData>& oneWeekBoundsData)
 {
     boundsData[pbId] = oneWeekBoundsData;
 }
@@ -14,7 +14,7 @@ void CandidateBase::prepareBoundsData(const std::set<Antares::Solver::WeeklyProb
     }
 }
 
-void CandidateBase::computeAndSetOneWeekCapacityData(Antares::Solver::WeeklyProblemId pbId,
+void CandidateBase::computeAndSetOneWeekCapacityData(const Antares::Solver::WeeklyProblemId& pbId,
                                                      const std::shared_ptr<Problem>& problem)
 {
     std::vector<BoundData> oneWeekBoundsData(NUMBER_OF_HOURS_PER_WEEK);
@@ -69,4 +69,29 @@ void CandidateBase::updateOscillationStatus(const CapacityAction& action)
         oscillationCounter += 1;
     }
     lastAction = action;
+}
+
+void CandidateBase::updateRentabilityWithProblem(
+  const Antares::Solver::WeeklyProblemId& pbIb,
+  const std::array<double, NUMBER_OF_HOURS_PER_WEEK>& areaPrices,
+  const std::vector<double>& solution)
+{
+    double production(0.0);
+    double problemRentability(0.0);
+    for (size_t hour = 0; hour < NUMBER_OF_HOURS_PER_WEEK; ++hour)
+    {
+        production = solution.at(dispProdVarIndices.at(hour));
+        problemRentability += (areaPrices.at(hour) - marginalCost) * production;
+    }
+    rentabilityPerProblem.insert(pbIb, problemRentability);
+}
+
+double CandidateBase::computeRentability()
+{
+    double rentability(0.0);
+    for (const auto& [pbId, problemRentability]: rentabilityPerProblem.get())
+    {
+        rentability += problemRentability;
+    }
+    return rentability;
 }

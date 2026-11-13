@@ -80,9 +80,13 @@ public:
     /// @param action The capacity action the rentability is computed for
     /// @param pbOutput The criterion values and prices computed for the problem
     /// @param solution The solution of the problem
-    void updateRentabilityWithProblem(const CapacityAction& action,
-                                      const PbOutput& pbOutput,
-                                      const std::vector<double>& solution);
+    void updateCandidatesRentabilityPerProblem(const CapacityAction& action,
+                                               const Antares::Solver::WeeklyProblemId& pbId,
+                                               const PbOutput& pbOutput,
+                                               const std::vector<double>& solution);
+
+    /// @brief Compute final candidates rentability
+    void computeCandidatesRentability(const CapacityAction& action);
 
     /// @brief Check decom candidates type against capacities retrieve from problems
     void checkDecomCandidatesTypeAgainstDecomCandidateCapacities() const;
@@ -104,10 +108,11 @@ private:
     /// @param pbOutput The criterion values and prices computed for the problem
     /// @param solution The solution of the problem
     template<typename T>
-    void computeRentabilityForCandidates(const std::map<std::string, Candidate<T>>& candidates,
-                                         const CapacityAction& action,
-                                         const PbOutput& pbOutput,
-                                         const std::vector<double>& solution);
+    void updateActionCandidatesRentabilityPerProblem(
+      std::map<std::string, Candidate<T>>& candidates,
+      const Antares::Solver::WeeklyProblemId& pbId,
+      const PbOutput& pbOutput,
+      const std::vector<double>& solution);
 
     /// @brief Compute the extra cost of the rentability of a candidate
     /// @param candidate The candidate to compute the extra cost for
@@ -129,4 +134,9 @@ private:
     template<typename T>
     void initializeRentabilityImpl(const std::map<std::string, Candidate<T>>& candidates,
                                    const CapacityAction& action);
+
+    /// @brief Compute final rentability the candidates
+    /// @param candidates The candidates to compute the rentability
+    template<typename T>
+    void computeActionCandidatesRentability(std::map<std::string, Candidate<T>>& candidates);
 };
