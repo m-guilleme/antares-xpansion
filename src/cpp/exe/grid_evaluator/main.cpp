@@ -155,7 +155,8 @@ int main(int argc, char** argv)
                                                                  / "user/water_values/grid.csv",
                                                                logger);
 
-        auto problemManager = std::make_shared<ProblemManager>(solverName,
+        auto problemManager = std::make_shared<ProblemManager>(logger,
+                                                               solverName,
                                                                problemFormat,
                                                                writePbFiles,
                                                                cacheProblems,

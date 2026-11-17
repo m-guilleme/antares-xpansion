@@ -32,28 +32,19 @@ bool isInvestmentAction(const CapacityAction& action)
     return action == CapacityAction::INVESTMENT || action == CapacityAction::DISINVESTMENT;
 }
 
-std::shared_ptr<ProblemManager> makeXpressProblemManager()
-{
-    return std::make_shared<ProblemManager>("xpress", "mps", false, true, "initial_problems");
-}
-
-void assertCandidateBounds(const std::shared_ptr<ProblemManager>& problemManager,
+void assertCandidateBounds(const std::shared_ptr<Problem>& problem,
                            const std::vector<int>& candidateIndices,
                            double expectedUpperBound,
                            double expectedLowerBound)
 {
-    for (const auto& pbId: problemManager->getProblemIds())
+    for (const int index: candidateIndices)
     {
-        auto problem = problemManager->getProblemFromId(pbId);
-        for (const int index: candidateIndices)
-        {
-            double upperBound;
-            double lowerBound;
-            problem->get_ub(&upperBound, index, index);
-            problem->get_lb(&lowerBound, index, index);
-            EXPECT_DOUBLE_EQ(upperBound, expectedUpperBound);
-            EXPECT_DOUBLE_EQ(lowerBound, expectedLowerBound);
-        }
+        double upperBound;
+        double lowerBound;
+        problem->get_ub(&upperBound, index, index);
+        problem->get_lb(&lowerBound, index, index);
+        EXPECT_DOUBLE_EQ(upperBound, expectedUpperBound);
+        EXPECT_DOUBLE_EQ(lowerBound, expectedLowerBound);
     }
 }
 } // namespace
@@ -97,6 +88,16 @@ protected:
                                 | std::filesystem::copy_options::overwrite_existing);
     }
 
+    std::shared_ptr<ProblemManager> makeXpressProblemManager()
+    {
+        return std::make_shared<ProblemManager>(logger,
+                                                "xpress",
+                                                "optimized",
+                                                false,
+                                                true,
+                                                "initial_problems");
+    }
+
     // Calls func on the investment candidate (INVESTMENT / DISINVESTMENT) or on the
     // decommissioning candidate (DECOMMISSIONING / RECOMMISSIONING) matching the action.
     // func must be a generic lambda returning the same type for both candidate types.
@@ -131,11 +132,10 @@ protected:
     // from it. The balancing config is read from the copied study unless inputBalFilePath is set.
     Balancing makeProblemGeneration(
       const std::string& studyName,
-      const std::shared_ptr<ProblemManager>& problemManager = std::make_shared<ProblemManager>(),
       const std::optional<std::filesystem::path>& inputBalFilePath = std::nullopt)
     {
         copyStudyData(studyName);
-
+        const std::shared_ptr<ProblemManager>& problemManager = makeXpressProblemManager();
         ConfigurationManager::ConfigDirectories directories{
           .study_dir = tmpDir,
           .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
@@ -155,7 +155,7 @@ protected:
         const std::vector<std::string> candidatesName = {"candidate_1", "candidate_2"};
 
         // dummy data, areas are replaced by the real test data below
-        auto bal = makeProblemGeneration("one_candidate_per_area", makeXpressProblemManager());
+        auto bal = makeProblemGeneration("one_candidate_per_area");
 
         // set real test data
         InputBalancingParser balParser(dataTestDir / "find_area_candidate_to_modify"
@@ -326,13 +326,13 @@ protected:
         {
             auto problem = problemManager->getProblemFromId(pbId);
             bal.applyActionToCandidate(pbId, problem, areaCandidatesToModify);
-        }
 
-        // we check that new bound of candidate have been correctly set
-        assertCandidateBounds(problemManager,
-                              vecIndices,
-                              expectedUpperCapacity,
-                              expectedLowerCapacity);
+            // we check that new bound of candidate have been correctly set
+            assertCandidateBounds(problem,
+                                  vecIndices,
+                                  expectedUpperCapacity,
+                                  expectedLowerCapacity);
+        }
     }
 
     void testComputeRentabilityForCandidates(const double hourlySolutionValue,
@@ -348,7 +348,7 @@ protected:
         const bool isInvestment = isInvestmentAction(action);
         const std::string candidateName = isInvestment ? "invest_peak2" : "unprofitable_peak";
 
-        auto bal = makeProblemGeneration("with_decom_candidate", makeXpressProblemManager());
+        auto bal = makeProblemGeneration("with_decom_candidate");
 
         // set test data
         visitCandidate(bal,
@@ -440,7 +440,6 @@ protected:
     {
         const std::string areaName = "area2";
         auto bal = makeProblemGeneration("with_decom_candidate",
-                                         std::make_shared<ProblemManager>(),
                                          dataTestDir / "determine_capacity_action"
                                            / "input_balancing.yml");
 
@@ -467,7 +466,7 @@ protected:
 
     void testMaxOscillationReached()
     {
-        auto bal = makeProblemGeneration("one_candidate_per_area", makeXpressProblemManager());
+        auto bal = makeProblemGeneration("one_candidate_per_area");
         AreaActions area1Action;
         Area& area = bal.areas.at("area1");
         // area.currentInvestmentIncrement = area.investmentIncrement * 0.1;

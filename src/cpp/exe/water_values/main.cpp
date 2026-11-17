@@ -239,7 +239,8 @@ int main(int argc, char** argv)
         bool antaresFormat = dpcr.getAntaresFormat();
         bool useOptimalTrajectory = dpcr.getUseOptimalTrajectory();
 
-        auto problemManager = std::make_shared<ProblemManager>(solverName,
+        auto problemManager = std::make_shared<ProblemManager>(logger,
+                                                               solverName,
                                                                problemFormat,
                                                                writePbFiles,
                                                                cacheProblems,

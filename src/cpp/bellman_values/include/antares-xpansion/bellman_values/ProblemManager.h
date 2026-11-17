@@ -14,7 +14,8 @@ class ProblemManager
 {
 public:
     // TODO: add a logger
-    ProblemManager(const std::string& solverName = "xpress",
+    ProblemManager(Logger logger,
+                   const std::string& solverName = "xpress",
                    const std::string& problemFormat = "OPTIMIZED",
                    bool writePbFiles = false,
                    bool cacheProblems = false,
@@ -153,15 +154,9 @@ private:
     {
         if (solverName_ != "xpress" && problemFormat == ProblemsFormat::OPTIMIZED)
         {
-            std::cout << "The optimized problem format is only compatible with Xpress solver. MPS "
-                         "format will be used.\n";
+            logger_->display_message("The optimized problem format is only compatible with Xpress "
+                                     "solver. MPS format will be used.");
             problemFormat_ = ProblemsFormat::MPS_FILE;
-        }
-        else if (!writePbFiles_)
-        {
-            std::cout << "Problem files are not required to be kept on disk - optimized svf files "
-                         "are used.\n";
-            problemFormat_ = ProblemsFormat::OPTIMIZED;
         }
         else
         {
@@ -169,6 +164,7 @@ private:
         }
     }
 
+    Logger logger_;
     bool cacheProblems_ = false; // for optimization purposes, problems can be read
                                  // from/saved on disk instead of in memory
     bool writePbFiles_ = false;  // save problem files to disk, for analysis purposes for example

@@ -102,7 +102,8 @@ int runBalancing(int argc, char** argv)
     logInfo(logger,
             "Generating problems (starting time: " + formatTime(startProblemGeneration) + ")");
 
-    auto problemManager = std::make_shared<ProblemManager>(solverName,
+    auto problemManager = std::make_shared<ProblemManager>(logger,
+                                                           solverName,
                                                            problemFormat,
                                                            keepMps,
                                                            cacheProblems,

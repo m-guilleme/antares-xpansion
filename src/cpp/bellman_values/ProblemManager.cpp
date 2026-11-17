@@ -1,10 +1,12 @@
 #include "antares-xpansion/bellman_values/ProblemManager.h"
 
-ProblemManager::ProblemManager(const std::string& solverName,
+ProblemManager::ProblemManager(Logger logger,
+                               const std::string& solverName,
                                const std::string& problemFormat,
                                bool writePbFiles,
                                bool cacheProblems,
                                std::optional<std::filesystem::path> problemsPath):
+    logger_(std::move(logger)),
     solverName_(solverName),
     writePbFiles_(writePbFiles),
     cacheProblems_(cacheProblems),
@@ -25,7 +27,8 @@ ProblemManager::ProblemManager(const std::string& solverName,
 }
 
 ProblemManager::ProblemManager(const ProblemManager& problemManagerToCopy):
-    ProblemManager(problemManagerToCopy.solverName_,
+    ProblemManager(std::move(problemManagerToCopy.logger_),
+                   problemManagerToCopy.solverName_,
                    "OPTIMIZED",
                    problemManagerToCopy.writePbFiles_,
                    problemManagerToCopy.cacheProblems_,
