@@ -3,6 +3,8 @@
 #include <string>
 
 #include "antares-xpansion/config_reader/ConfigReader.h"
+#include "antares-xpansion/multisolver_interface/SolverAbstract.h"
+#include "antares-xpansion/multisolver_interface/SolverConfig.h"
 
 class SettingsConfigReader: ConfigReader
 {
@@ -11,6 +13,12 @@ public:
     {
         emplaceAllElements(); // this method must be defined in the derived class
         initializeAllElements(pathToYamlConfigFile); // this method comes from the base class
+        std::string solverName = getSolver();
+        if (!(SolverConfig("xpress") == solverName || SolverConfig("CBC") == solverName))
+        {
+            throw std::runtime_error(
+              "Unrecognized solver name. Update settings.yml with a correct solver.");
+        }
     }
 
     // these getters are still useful to enforce types
