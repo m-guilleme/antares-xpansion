@@ -367,24 +367,10 @@ Balancing::Balancing(ConfigurationManager::ConfigDirectories directories,
     ProblemGenerationOptimSimu(directories, logger, problemManager),
     areas(std::move(areas))
 {
-    logMessage("Get candidates indices and marginal cost");
-    const auto startFillDispProdVarInd = std::chrono::steady_clock::now();
-    fillDispProdVarIndicesAndMarginalCosts();
-    const std::chrono::duration<double>
-      durationFillDispProdVarInd = std::chrono::steady_clock::now() - startFillDispProdVarInd;
-    logMessage("Duration: " + formatDuration(durationFillDispProdVarInd));
-    logMessage("Get candidate bounds data");
-    const auto startSetCapacity = std::chrono::steady_clock::now();
-    setCapacitiesDataForCandidates();
-    const std::chrono::duration<double> durationSetCapacity = std::chrono::steady_clock::now()
-                                                              - startSetCapacity;
-    logMessage("Duration: " + formatDuration(durationSetCapacity));
-    logMessage("Check inputs against candidate capacity");
-    const auto startCheckInputsBalancing = std::chrono::steady_clock::now();
-    checkInputsBalancing();
-    const std::chrono::duration<double>
-      durationCheckInputsBalancing = std::chrono::steady_clock::now() - startCheckInputsBalancing;
-    logMessage("Duration: " + formatDuration(durationCheckInputsBalancing));
+    timedStep("Get candidates indices and marginal cost",
+              [this] { fillDispProdVarIndicesAndMarginalCosts(); });
+    timedStep("Get candidate bounds data", [this] { setCapacitiesDataForCandidates(); });
+    timedStep("Check inputs against candidate capacity", [this] { checkInputsBalancing(); });
 }
 
 void Balancing::fillDispProdVarIndicesAndMarginalCosts()
@@ -591,13 +577,8 @@ void Balancing::computeAllCandidatesRentability(const SimuValues& simuValues)
 
 AreaActions Balancing::findAreaCandidatesToModify(const SimuValues& simuValues)
 {
-    logMessage("Update areas increment");
-    const auto startUpdateAreasIncrement = std::chrono::steady_clock::now();
     areasAction.clear();
-    updateAreasIncrement();
-    const std::chrono::duration<double>
-      durationUpdateAreasIncrement = std::chrono::steady_clock::now() - startUpdateAreasIncrement;
-    logMessage("Duration: " + formatDuration(durationUpdateAreasIncrement));
+    timedStep("Update areas increment", [this] { updateAreasIncrement(); });
 
     logMessage("Determine action per area");
     const auto startDetermineCapacityAction = std::chrono::steady_clock::now();
@@ -619,12 +600,8 @@ AreaActions Balancing::findAreaCandidatesToModify(const SimuValues& simuValues)
                                         - startDetermineCapacityAction;
     logMessage("Duration: " + formatDuration(durationDetermineCapacityAction));
 
-    logMessage("Compute rentability per candidates for each area");
-    const auto startUpdateRentability = std::chrono::steady_clock::now();
-    computeAllCandidatesRentability(simuValues);
-    const std::chrono::duration<double> durationUpdateRentability = std::chrono::steady_clock::now()
-                                                                    - startUpdateRentability;
-    logMessage("Duration: " + formatDuration(durationUpdateRentability));
+    timedStep("Compute rentability per candidates for each area",
+              [this, &simuValues] { computeAllCandidatesRentability(simuValues); });
 
     logMessage("Select candidates with best rentability");
     const auto startSelectBestCandidate = std::chrono::steady_clock::now();
@@ -783,6 +760,16 @@ SimuValues Balancing::solveAndComputeCriterionAndPrice(const AreaActions& areaCa
 void Balancing::logMessage(const std::string& message, LogUtils::LOGLEVEL level) const
 {
     logger->display_message(message, level, PROBLEM_GENERATION_LOGGER_CONTEXT);
+}
+
+template<typename Func>
+void Balancing::timedStep(const std::string& message, Func&& func) const
+{
+    logMessage(message);
+    const auto start = std::chrono::steady_clock::now();
+    std::forward<Func>(func)();
+    const std::chrono::duration<double> duration = std::chrono::steady_clock::now() - start;
+    logMessage("Duration: " + formatDuration(duration));
 }
 
 void Balancing::logAreasView() const

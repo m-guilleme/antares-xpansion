@@ -171,6 +171,12 @@ private:
     void logMessage(const std::string& message,
                     LogUtils::LOGLEVEL level = LogUtils::LOGLEVEL::INFO) const;
 
+    /// @brief Log the task and duration around for called method
+    /// @param message The message to log
+    /// @param func The function to log
+    template<typename Func>
+    void timedStep(const std::string& message, Func&& func) const;
+
     /// @brief Log, for every area, its criterion state and its candidates capacities
     void logAreasView() const;
 

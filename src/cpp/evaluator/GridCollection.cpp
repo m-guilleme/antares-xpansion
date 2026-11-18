@@ -5,6 +5,18 @@
 #include <ranges>
 #include <regex>
 
+namespace
+{
+std::string toLower(std::string_view text)
+{
+    std::string lower(text);
+    std::ranges::transform(lower,
+                           lower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lower;
+}
+} // namespace
+
 /// @brief Checks if a gridElement is valid
 /// - 0.0 <= min <= 1.0 AND 0.0 <= max <= 1.0 AND min <= max
 /// - min == max (only one point) OR 0.0 < step <= 1.0
@@ -87,7 +99,7 @@ GridCollection::GridCollection(const std::filesystem::path& filePath,
         std::string pbName = tokens[1];
         std::string type = tokens[2];
         std::string cstName = tokens[3];
-        std::string areaName = tokens[4];
+        std::string areaName = toLower(tokens[4]);
 
         double min = std::stod(tokens[5]);
         double max = std::stod(tokens[6]);

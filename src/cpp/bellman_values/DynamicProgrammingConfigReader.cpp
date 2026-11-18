@@ -1,5 +1,19 @@
 #include "include/antares-xpansion/bellman_values/DynamicProgrammingConfigReader.h"
 
+#include <ranges>
+
+namespace
+{
+std::string toLower(std::string_view text)
+{
+    std::string lower(text);
+    std::ranges::transform(lower,
+                           lower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lower;
+}
+} // namespace
+
 void DynamicProgrammingConfigReader::emplaceAllElements()
 {
     // instantiate all elements with key (as in YAML), default value, and boolean for optional
@@ -23,7 +37,7 @@ void DynamicProgrammingConfigReader::parsePenaltiesByArea()
         {
             if (penaltiesNode.second)
             {
-                std::string areaName = penaltiesNode.first.as<std::string>();
+                std::string areaName = toLower(penaltiesNode.first.as<std::string>());
                 std::cout << "Parsing penalty for area " << areaName << std::endl;
                 // instantiating penalty with default values
                 std::map<std::string, YAMLElement> penalty = instantiatePenalty();
