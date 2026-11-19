@@ -241,7 +241,7 @@ TEST_F(BellmanValuesComputeTest, unitTestPenalties)
 
 TEST_F(BellmanValuesComputeTest, unitTestPenaltiesWithFinalLevel)
 {
-    ReservoirManagement reservoirManagement(evaluatorMock.reservoirMock, 10, 10, 30, true, 400);
+    ReservoirManagement reservoirManagement(evaluatorMock.reservoirMock, 10, 10, 30, true, 0.8);
     auto [bellmanValues, costs] = BellmanValues(evaluatorMock, reservoirManagement, logger)
                                     .compute(6);
 

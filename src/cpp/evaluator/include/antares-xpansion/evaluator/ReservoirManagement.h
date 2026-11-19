@@ -89,7 +89,7 @@ public:
     double penalty_final_level;       // penalty per MWh if final level is not reached
     bool force_final_level;           // true -> final level is forced to final_level
     double final_level; // value of the final level to reached if forces. If not given, default
-                        // value is reservoir.inital_level
+                        // value is reservoir.initial_level
     double cvar; // proportion of scenarios to take into account, sorted by cost. 1.0 -> take all
                  // scenarios into account, 0.5 -> take only the 50% most expensive scenarios into
                  // account, 0.0 -> take only the most expensive scenario into account.

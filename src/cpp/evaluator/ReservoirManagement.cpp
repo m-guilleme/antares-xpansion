@@ -164,7 +164,7 @@ void Reservoir::loadHydroIni(const std::filesystem::path& ini_path)
     }
     if (!found_efficiency)
     {
-        throw std::runtime_error("Missing efficiency for area: " + area);
+        efficiency = 1;
     }
     // computing water values requires that the area uses heuristic and not water
     // but only if said sections exist
@@ -359,7 +359,7 @@ ReservoirManagement::ReservoirManagement(Reservoir& reservoir,
     penalty_upper_rule_curve(penalty_upper_rule_curve),
     penalty_final_level(penalty_final_level),
     force_final_level(force_final_level),
-    final_level(final_level.value_or(reservoir.initial_level)),
+    final_level(final_level ? *final_level * reservoir.capacity : reservoir.initial_level),
     cvar(cvar)
 {
 }
