@@ -69,6 +69,31 @@ void DynamicProgrammingConfigReader::parsePenaltiesByArea()
     defaultPenalty_ = instantiatePenalty();
 }
 
+void DynamicProgrammingConfigReader::checkInputs()
+{
+    std::vector<std::string> term_used = {startWeekKey,
+                                          endWeekKey,
+                                          nbLevelsKey,
+                                          antaresFormatKey,
+                                          useOptimalTrajectoryKey,
+                                          penaltiesKey,
+                                          penaltyBottomRuleCurveKey,
+                                          penaltyUpperRuleCurveKey,
+                                          penaltyFinalLevelKey,
+                                          forceFinalLevelKey,
+                                          finalLevelKey,
+                                          cvarKey};
+
+    for (const auto& kv: config_)
+    {
+        const std::string key = kv.first.as<std::string>();
+        if (std::ranges::find(term_used, key) == term_used.end())
+        {
+            throw std::runtime_error("Unknown key in the input file : " + key);
+        }
+    }
+}
+
 std::map<std::string, ConfigReader::YAMLElement>
 DynamicProgrammingConfigReader::instantiatePenalty()
 {

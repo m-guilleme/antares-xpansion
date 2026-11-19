@@ -14,6 +14,7 @@ public:
         emplaceAllElements(); // this method must be defined in the derived class
         initializeAllElements(pathToYamlConfigFile); // this method comes from the base class
         parsePenaltiesByArea();                      // specifically for penalties by area
+        checkInputs();
     }
 
     // these getters are still useful to select an area, and to enforce types
@@ -138,6 +139,9 @@ private:
 
     /// @brief Parse the YAML file to find penalties values for all areas
     void parsePenaltiesByArea();
+
+    /// @brief Check inputs
+    void checkInputs();
 
     /// @brief A method returning a properly instantiated collection of penalties-related values,
     /// with their default values

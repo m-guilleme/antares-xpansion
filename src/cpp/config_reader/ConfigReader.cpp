@@ -47,13 +47,14 @@ void ConfigReader::YAMLElement::updateValue(const YAML::Node& config)
         }
         else
         {
-            throw std::runtime_error("Failed to find " + key + " or its value in the config file.");
+            // fall back on default value
+            value = defaultValue;
         }
     }
     catch (const std::exception& e)
     {
         std::throw_with_nested(
-          std::runtime_error("Error parsing YAML file for key: " + key + " (" + e.what() + ")"));
+          std::runtime_error("Error parsing YAML file for key: " + key + " (" + e.what() + " )"));
     }
 }
 
