@@ -734,6 +734,7 @@ void Balancing::applyActionToCandidate(Antares::Solver::WeeklyProblemId pbId,
         }
     }
     problem->chg_bounds(cBoundsChange.varIndices, cBoundsChange.boundTypes, cBoundsChange.values);
+    problemManager->setProblem(pbId, problem);
 }
 
 SimuValues Balancing::solveAndComputeCriterionAndPrice(const AreaActions& areaCandidatesToModify,
