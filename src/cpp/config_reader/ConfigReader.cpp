@@ -1,5 +1,7 @@
+
 #include "include/antares-xpansion/config_reader/ConfigReader.h"
 
+#include <algorithm>
 #include <iostream>
 
 ConfigReader::~ConfigReader()
@@ -60,6 +62,7 @@ void ConfigReader::YAMLElement::updateValue(const YAML::Node& config)
 
 void ConfigReader::initializeAllElements(const std::filesystem::path& pathToYamlConfigFile)
 {
+    pathToYamlConfigFile_ = pathToYamlConfigFile.string();
     if (std::filesystem::exists(pathToYamlConfigFile))
     {
         std::cout << "Reading values in " << pathToYamlConfigFile.string() << std::endl;
@@ -77,5 +80,37 @@ void ConfigReader::initializeAllElements(const std::filesystem::path& pathToYaml
         // falling back on default values
         std::cout << "No yaml file found at the specified location ("
                        + pathToYamlConfigFile.string() + "), falling back on default values.\n";
+    }
+}
+
+void ConfigReader::checkUnknownKeys(const std::vector<std::string>& extraKeys) const
+{
+    checkUnknownKeysInNode(config_, elements_, extraKeys);
+}
+
+void ConfigReader::checkUnknownKeysInNode(
+  const YAML::Node& node,
+  const std::map<std::string, YAMLElement>& expectedElements,
+  const std::vector<std::string>& extraKeys,
+  const std::string& context) const
+{
+    // no file, empty file or empty section: nothing to check
+    if (!node || !node.IsMap())
+    {
+        return;
+    }
+
+    for (const auto& kv: node)
+    {
+        const std::string key = kv.first.as<std::string>();
+        if (!expectedElements.contains(key) && std::ranges::find(extraKeys, key) == extraKeys.end())
+        {
+            std::string message = "Unknown key in the input file " + pathToYamlConfigFile_;
+            if (!context.empty())
+            {
+                message += " (in " + context + ")";
+            }
+            throw std::runtime_error(message + " : " + key);
+        }
     }
 }

@@ -1,9 +1,12 @@
+
 #pragma once
 #include <filesystem>
 #include <map>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <variant>
+#include <vector>
 
 #include "yaml-cpp/yaml.h"
 
@@ -74,7 +77,7 @@ protected:
         }
         // for good measure: raise an error if no value found
         throw std::runtime_error("Value was not found in YAML file " + pathToYamlConfigFile_
-                                 + "for key: " + key);
+                                 + " for key: " + key);
     }
 
     /**
@@ -91,6 +94,29 @@ protected:
      * @param pathToYamlConfigFile
      */
     void initializeAllElements(const std::filesystem::path& pathToYamlConfigFile);
+
+    /**
+     * @brief Throws if the root of the YAML file contains a key that is not one of elements_.
+     * Derived classes must call it after initializeAllElements.
+     *
+     * @param extraKeys keys accepted at root level that are not in elements_ (e.g. a section
+     * parsed separately, like "penalties")
+     */
+    void checkUnknownKeys(const std::vector<std::string>& extraKeys = {}) const;
+
+    /**
+     * @brief Throws if a YAML map node contains a key that is neither in expectedElements nor in
+     * extraKeys. Does nothing if the node is not a map (absent file, empty section...).
+     *
+     * @param node the YAML node whose keys are checked
+     * @param expectedElements the elements expected in this node
+     * @param extraKeys other accepted keys
+     * @param context where the node is in the file, used in the error message
+     */
+    void checkUnknownKeysInNode(const YAML::Node& node,
+                                const std::map<std::string, YAMLElement>& expectedElements,
+                                const std::vector<std::string>& extraKeys = {},
+                                const std::string& context = "") const;
 
     /**
      * @brief a map holding all expected elements from the YAML by their key, to be defined by

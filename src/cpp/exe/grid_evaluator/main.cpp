@@ -125,7 +125,7 @@ int main(int argc, char** argv)
 
         // SettingsConfigReader will check whether the settings.yml file exists and
         // return default values if needed
-        SettingsConfigReader scr(settingsConfigFilePath);
+        bellman_values::SettingsConfigReader scr(settingsConfigFilePath);
         std::string solverName = scr.getSolver();
         bool writePbFiles = scr.getKeepMps();
         const std::string problemFormat = scr.getProblemFormat();

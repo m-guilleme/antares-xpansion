@@ -1,5 +1,7 @@
+
 #include "include/antares-xpansion/bellman_values/DynamicProgrammingConfigReader.h"
 
+#include <algorithm>
 #include <ranges>
 
 namespace
@@ -71,25 +73,19 @@ void DynamicProgrammingConfigReader::parsePenaltiesByArea()
 
 void DynamicProgrammingConfigReader::checkInputs()
 {
-    std::vector<std::string> term_used = {startWeekKey,
-                                          endWeekKey,
-                                          nbLevelsKey,
-                                          antaresFormatKey,
-                                          useOptimalTrajectoryKey,
-                                          penaltiesKey,
-                                          penaltyBottomRuleCurveKey,
-                                          penaltyUpperRuleCurveKey,
-                                          penaltyFinalLevelKey,
-                                          forceFinalLevelKey,
-                                          finalLevelKey,
-                                          cvarKey};
+    // root level: global parameters and the penalties section
+    checkUnknownKeys({penaltiesKey});
 
-    for (const auto& kv: config_)
+    // penalties section: each area may only contain penalty keys
+    const YAML::Node& root = config_; // const access, so that operator[] does not modify config_
+    if (root.IsMap() && root[penaltiesKey] && root[penaltiesKey].IsMap())
     {
-        const std::string key = kv.first.as<std::string>();
-        if (std::ranges::find(term_used, key) == term_used.end())
+        for (const auto& areaNode: root[penaltiesKey])
         {
-            throw std::runtime_error("Unknown key in the input file : " + key);
+            checkUnknownKeysInNode(areaNode.second,
+                                   defaultPenalty_,
+                                   {},
+                                   penaltiesKey + "/" + areaNode.first.as<std::string>());
         }
     }
 

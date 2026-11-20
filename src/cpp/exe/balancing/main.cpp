@@ -75,7 +75,7 @@ int runBalancing(int argc, char** argv)
 
     // SettingsConfigReader checks whether the settings file exists
     // and returns default values if needed
-    SettingsConfigReader settings(studyPath / SETTINGS_FILE);
+    balancing::SettingsConfigReader settings(studyPath / SETTINGS_FILE);
     const std::string solverName = settings.getSolver();
     const std::string problemFormat = settings.getProblemFormat();
     const std::string verbosity = settings.getVerbosity();

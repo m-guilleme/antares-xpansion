@@ -12,12 +12,16 @@ add_library(config_reader_lib STATIC)
 
 target_sources(config_reader_lib PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/ConfigReader.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/CommonSettingsConfigReader.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/config_reader/ConfigReader.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/antares-xpansion/config_reader/CommonSettingsConfigReader.h
 )
 
 target_link_libraries(config_reader_lib
         PUBLIC
         yaml-cpp::yaml-cpp
+        PRIVATE
+        antaresXpansion::solvers
 )
 
 target_include_directories(config_reader_lib
