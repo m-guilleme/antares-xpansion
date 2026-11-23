@@ -130,8 +130,10 @@ penalties:
     # default: false
 
     final_level : ~
-    # default: initial level
-
+    # Ratio of reservoir capacity used as final level (value between 0.0 and 1.0)
+    # default: initial level from reservoir
+    # will be restricted to [0.0 ; 1.0]
+    
     cvar : 0.8
     # default: 1.0 (all scenarios taken into account for Bellman values)
     # will be restricted to [0.0 ; 1.0]

@@ -92,10 +92,9 @@ void DynamicProgrammingConfigReader::checkInputs()
     for (const auto& [areaName, areaPenalties]: penalties_)
     {
         auto finalLevel = getValueFromKey<std::optional<double>>(finalLevelKey, areaPenalties);
-        if (finalLevel.has_value() && (0 > finalLevel || finalLevel > 100))
+        if (finalLevel.has_value() && (0 > finalLevel || finalLevel > 1))
         {
-            throw std::runtime_error("Final level for " + areaName
-                                     + " must be between 0\% and 100\%.");
+            throw std::runtime_error("Final level for " + areaName + " must be between 0 and 1.");
         }
     }
 }
