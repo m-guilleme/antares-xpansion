@@ -152,7 +152,7 @@ private:
 
     void setProblemFormat(const ProblemsFormat& problemFormat)
     {
-        if (solverName_ != "xpress" && problemFormat == ProblemsFormat::OPTIMIZED)
+        if (solverName_ != SolverConfig("xpress") && problemFormat == ProblemsFormat::OPTIMIZED)
         {
             logger_->display_message("The optimized problem format is only compatible with Xpress "
                                      "solver. MPS format will be used.");
