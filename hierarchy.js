@@ -33,25 +33,47 @@ var hierarchy =
     [ "BellmanValues", "classBellmanValues.html", null ],
     [ "BendersApp", "classBendersApp.html", null ],
     [ "BendersBase", "classBendersBase.html", [
-      [ "BendersBaseDouble", "classBendersBaseDouble.html", null ],
+      [ "BendersByBatch", "classBendersByBatch.html", null ],
       [ "BendersMicroIterationsDouble", "classBendersMicroIterationsDouble.html", null ],
-      [ "BendersMpi", "classBendersMpi.html", [
-        [ "BendersByBatch", "classBendersByBatch.html", null ]
-      ] ],
+      [ "BendersMpi", "classBendersMpi.html", null ],
       [ "BendersSequential", "classBendersSequential.html", [
         [ "BendersSequentialDouble", "classBendersSequentialDouble.html", null ]
       ] ]
     ] ],
+    [ "BendersCutsManager< Derived >", "classBendersCutsManager.html", null ],
+    [ "BendersCutsManager< BendersCutsManagerByBatch >", "classBendersCutsManager.html", [
+      [ "BendersCutsManagerByBatch", "classBendersCutsManagerByBatch.html", null ]
+    ] ],
+    [ "BendersCutsManager< BendersCutsManagerMpi >", "classBendersCutsManager.html", [
+      [ "BendersCutsManagerMpi", "classBendersCutsManagerMpi.html", null ]
+    ] ],
+    [ "BendersCutsManager< BendersCutsManagerSequential >", "classBendersCutsManager.html", [
+      [ "BendersCutsManagerSequential", "classBendersCutsManagerSequential.html", null ]
+    ] ],
     [ "antares_xpansion.benders_driver.BendersDriver", "classantares__xpansion_1_1benders__driver_1_1BendersDriver.html", null ],
     [ "BendersFactory::BendersEnvironment", "structBendersFactory_1_1BendersEnvironment.html", null ],
     [ "BendersFactory", "classBendersFactory.html", null ],
+    [ "BendersMasterManager", "classBendersMasterManager.html", null ],
+    [ "BendersOuterLoopManager", "classBendersOuterLoopManager.html", null ],
+    [ "BendersOutputManager", "classBendersOutputManager.html", null ],
     [ "BendersPlugin", "classBendersPlugin.html", [
       [ "BendersPluginStub", "classBendersPluginStub.html", null ],
       [ "Benders_MICRO_ITERS", "classBenders__MICRO__ITERS.html", null ],
-      [ "NoOperationPlugin", "classNoOperationPlugin.html", null ]
+      [ "NoOperationPlugin", "classNoOperationPlugin.html", null ],
+      [ "PluginHooksRecorder", "classPluginHooksRecorder.html", null ]
     ] ],
     [ "BendersPluginFactory", "classBendersPluginFactory.html", null ],
     [ "BendersRelevantIterationsData", "structBendersRelevantIterationsData.html", null ],
+    [ "BendersSubProblemsManager< Derived >", "classBendersSubProblemsManager.html", null ],
+    [ "BendersSubProblemsManager< BendersSubProblemsManagerByBatch >", "classBendersSubProblemsManager.html", [
+      [ "BendersSubProblemsManagerByBatch", "classBendersSubProblemsManagerByBatch.html", null ]
+    ] ],
+    [ "BendersSubProblemsManager< BendersSubProblemsManagerMpi >", "classBendersSubProblemsManager.html", [
+      [ "BendersSubProblemsManagerMpi", "classBendersSubProblemsManagerMpi.html", null ]
+    ] ],
+    [ "BendersSubProblemsManager< BendersSubProblemsManagerSequential >", "classBendersSubProblemsManager.html", [
+      [ "BendersSubProblemsManagerSequential", "classBendersSubProblemsManagerSequential.html", null ]
+    ] ],
     [ "Candidate", "classCandidate.html", null ],
     [ "MergeMasterTrajectoryMPS::CandidateCosts", "structMergeMasterTrajectoryMPS_1_1CandidateCosts.html", null ],
     [ "CandidateData", "structCandidateData.html", null ],
@@ -103,6 +125,7 @@ var hierarchy =
     [ "std::enable_shared_from_this", null, [
       [ "SolverAbstract", "classSolverAbstract.html", [
         [ "NOOPSolver", "classNOOPSolver.html", [
+          [ "ControllableSolver", "classControllableSolver.html", null ],
           [ "NOOPSolverForSkeleton", "classNOOPSolverForSkeleton.html", null ],
           [ "NOOPSolverForWorker", "classNOOPSolverForWorker.html", [
             [ "NOOPSolverForWorkerMaster", "classNOOPSolverForWorkerMaster.html", [
@@ -246,7 +269,7 @@ var hierarchy =
     [ "FilesMapper", "classFilesMapper.html", null ],
     [ "tests.end_to_end.utils_functions.FilesToRead", "classtests_1_1end__to__end_1_1utils__functions_1_1FilesToRead.html", null ],
     [ "formatter", null, [
-      [ "fmt::formatter< ProblemsFormat >", "structfmt_1_1formatter_3_01ProblemsFormat_01_4.html", null ]
+      [ "fmt::formatter< ProblemFormat >", "structfmt_1_1formatter_3_01ProblemFormat_01_4.html", null ]
     ] ],
     [ "antares_xpansion.full_run_driver.FullRunDriver", "classantares__xpansion_1_1full__run__driver_1_1FullRunDriver.html", null ],
     [ "antares_xpansion.gems_driver.GemsDriver", "classantares__xpansion_1_1gems__driver_1_1GemsDriver.html", null ],
@@ -338,6 +361,9 @@ var hierarchy =
     [ "InvalidSolverStatusException", "classInvalidSolverStatusException.html", null ],
     [ "InvalidStatusException", "classInvalidStatusException.html", null ],
     [ "InvalidStructureFile", "structInvalidStructureFile.html", null ],
+    [ "IOuterLoopFacade", "classIOuterLoopFacade.html", [
+      [ "OuterLoopFacade", "classOuterLoopFacade.html", null ]
+    ] ],
     [ "IProblemProviderPort", "classIProblemProviderPort.html", [
       [ "FileProblemProviderAdapter", "classFileProblemProviderAdapter.html", null ],
       [ "MPSFileProblemProviderAdapter", "classMPSFileProblemProviderAdapter.html", null ],
@@ -353,6 +379,7 @@ var hierarchy =
     ] ],
     [ "StringManip::IsNot< mask >", "classStringManip_1_1IsNot.html", null ],
     [ "Output::Iteration", "structOutput_1_1Iteration.html", null ],
+    [ "IterationControlData", "structIterationControlData.html", null ],
     [ "xpansion::logger::IterationResultLog", "classxpansion_1_1logger_1_1IterationResultLog.html", null ],
     [ "Output::IterationsData", "structOutput_1_1IterationsData.html", null ],
     [ "IWriterLogger", "classIWriterLogger.html", null ],
@@ -381,6 +408,7 @@ var hierarchy =
       [ "AdditionalConstraint", "classAdditionalConstraint.html", null ],
       [ "AdditionalConstraints", "classAdditionalConstraints.html", null ]
     ] ],
+    [ "MasterData", "structMasterData.html", null ],
     [ "MasterGeneration", "classMasterGeneration.html", null ],
     [ "MasterProblemBuilder", "classMasterProblemBuilder.html", null ],
     [ "MathLoggerFactory", "classMathLoggerFactory.html", null ],
@@ -488,6 +516,7 @@ var hierarchy =
     [ "SkeletonConstraintSetLoader", "classSkeletonConstraintSetLoader.html", null ],
     [ "SkeletonSolverLoader", "classSkeletonSolverLoader.html", null ],
     [ "Output::SolutionData", "structOutput_1_1SolutionData.html", null ],
+    [ "SolutionPointData", "structSolutionPointData.html", null ],
     [ "SolverConfig", "classSolverConfig.html", null ],
     [ "SolverData", "structSolverData.html", null ],
     [ "SolverFactory", "classSolverFactory.html", null ],
@@ -514,6 +543,7 @@ var hierarchy =
     ] ],
     [ "SubproblemBasisCache", "classSubproblemBasisCache.html", null ],
     [ "SubproblemConstraintsManager", "classSubproblemConstraintsManager.html", null ],
+    [ "SubproblemCutsData", "structSubproblemCutsData.html", null ],
     [ "PlainData::SubProblemData", "structPlainData_1_1SubProblemData.html", null ],
     [ "tests.end_to_end.cucumber.features.steps.then.SubProblemStats", "classtests_1_1end__to__end_1_1cucumber_1_1features_1_1steps_1_1then_1_1SubProblemStats.html", null ],
     [ "SubproblemWorkerFactory", "classSubproblemWorkerFactory.html", null ],
@@ -529,12 +559,13 @@ var hierarchy =
       [ "ArchiveWriterTest", "classArchiveWriterTest.html", null ],
       [ "BatchCollectionTest", "classBatchCollectionTest.html", null ],
       [ "BellmanValuesComputeTest", "classBellmanValuesComputeTest.html", null ],
-      [ "BendersBaseTest", "classBendersBaseTest.html", null ],
       [ "BendersMicroIterationsTest", "classBendersMicroIterationsTest.html", null ],
       [ "BendersSequentialTest", "classBendersSequentialTest.html", [
         [ "BendersSequentialTestBySolver", "classBendersSequentialTestBySolver.html", null ],
         [ "BendersSequentialTestSolverAndFormat", "classBendersSequentialTestSolverAndFormat.html", null ]
       ] ],
+      [ "BendersSubProblemsManagerByBatchTest", "classBendersSubProblemsManagerByBatchTest.html", null ],
+      [ "BendersSubProblemsManagerTest", "classBendersSubProblemsManagerTest.html", null ],
       [ "CandidatesINIReaderTest", "classCandidatesINIReaderTest.html", null ],
       [ "ChronicleProviderTest", "classChronicleProviderTest.html", null ],
       [ "ChronicleTest", "classChronicleTest.html", null ],
@@ -565,6 +596,7 @@ var hierarchy =
         [ "ProblemModifierTestWithProfile", "classProblemModifierTestWithProfile.html", null ]
       ] ],
       [ "RandomBatchShufflerTest", "classRandomBatchShufflerTest.html", null ],
+      [ "RestartModeFromStringTest", "classRestartModeFromStringTest.html", null ],
       [ "SensitivityFileLoggerTest", "classSensitivityFileLoggerTest.html", null ],
       [ "SensitivityInputReaderTest", "classSensitivityInputReaderTest.html", null ],
       [ "SensitivityMasterLoggerTest", "classSensitivityMasterLoggerTest.html", null ],
@@ -617,6 +649,7 @@ var hierarchy =
     [ "tests.python.test_study_output_cleaner.TestStudyOutputCleaner", "classtests_1_1python_1_1test__study__output__cleaner_1_1TestStudyOutputCleaner.html", null ],
     [ "tests.python.test_study_updater.TestStudyUpdater", "classtests_1_1python_1_1test__study__updater_1_1TestStudyUpdater.html", null ],
     [ "tests.python.test_trajectory_cleanup.TestTrajectoryCleanup", "classtests_1_1python_1_1test__trajectory__cleanup_1_1TestTrajectoryCleanup.html", null ],
+    [ "tests.python.test_trajectory_input_translation.TestTrajectoryInputTranslationEndToEnd", "classtests_1_1python_1_1test__trajectory__input__translation_1_1TestTrajectoryInputTranslationEndToEnd.html", null ],
     [ "testing::TestWithParam", null, [
       [ "CreateFixture", "classCreateFixture.html", null ],
       [ "FullRunOptionsParserTest", "classFullRunOptionsParserTest.html", [

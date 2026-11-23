@@ -12,7 +12,7 @@ var searchData=
   ['filewriter_9',['FileWriter',['../classFileWriter.html',1,'']]],
   ['filteredlogger_10',['FilteredLogger',['../classFilteredLogger.html',1,'']]],
   ['fixturempsfileproblemprovideradapter_11',['FixtureMPSFileProblemProviderAdapter',['../classFixtureMPSFileProblemProviderAdapter.html',1,'']]],
-  ['formatter_3c_20problemsformat_20_3e_12',['formatter&lt; ProblemsFormat &gt;',['../structfmt_1_1formatter_3_01ProblemsFormat_01_4.html',1,'fmt']]],
+  ['formatter_3c_20problemformat_20_3e_12',['formatter&lt; ProblemFormat &gt;',['../structfmt_1_1formatter_3_01ProblemFormat_01_4.html',1,'fmt']]],
   ['formulationenum_13',['FormulationEnum',['../classuser__input__translation_1_1FormulationEnum.html',1,'user_input_translation']]],
   ['fullrundriver_14',['FullRunDriver',['../classantares__xpansion_1_1full__run__driver_1_1FullRunDriver.html',1,'antares_xpansion::full_run_driver']]],
   ['fullrunexecutionerror_15',['FullRunExecutionError',['../classantares__xpansion_1_1full__run__driver_1_1FullRunDriver_1_1FullRunExecutionError.html',1,'antares_xpansion::full_run_driver::FullRunDriver']]],

@@ -1,5 +1,14 @@
 var NAVTREEINDEX5 =
 {
+"classantares__xpansion_1_1config__loader_1_1XpansionSettingsReader.html":[44,0,0,2,2],
+"classantares__xpansion_1_1config__loader_1_1XpansionSettingsReader.html":[46,0,0,5,2],
+"classantares__xpansion_1_1config__loader_1_1XpansionSettingsReader.html#a2f48455d4f11ca7cfd31877c89dc3af7":[44,0,0,2,2,3],
+"classantares__xpansion_1_1config__loader_1_1XpansionSettingsReader.html#a2f48455d4f11ca7cfd31877c89dc3af7":[46,0,0,5,2,3],
+"classantares__xpansion_1_1config__loader_1_1XpansionSettingsReader.html#a411fce38086a815b5914b99e1d6d5075":[44,0,0,2,2,4],
+"classantares__xpansion_1_1config__loader_1_1XpansionSettingsReader.html#a411fce38086a815b5914b99e1d6d5075":[46,0,0,5,2,4],
+"classantares__xpansion_1_1config__loader_1_1XpansionSettingsReader.html#a4b5577d5565426f6b644631867f6f9b0":[44,0,0,2,2,17],
+"classantares__xpansion_1_1config__loader_1_1XpansionSettingsReader.html#a4b5577d5565426f6b644631867f6f9b0":[46,0,0,5,2,17],
+"classantares__xpansion_1_1config__loader_1_1XpansionSettingsReader.html#a4feaf574831d7d9780504b3424ce1bae":[44,0,0,2,2,19],
 "classantares__xpansion_1_1config__loader_1_1XpansionSettingsReader.html#a4feaf574831d7d9780504b3424ce1bae":[46,0,0,5,2,19],
 "classantares__xpansion_1_1config__loader_1_1XpansionSettingsReader.html#a734c86fa0787a3b5b390cfcdbb1ff4ee":[44,0,0,2,2,2],
 "classantares__xpansion_1_1config__loader_1_1XpansionSettingsReader.html#a734c86fa0787a3b5b390cfcdbb1ff4ee":[46,0,0,5,2,2],
@@ -220,7 +229,7 @@ var NAVTREEINDEX5 =
 "classargs__parser__trajectory_1_1TrajectoryArgsParser_1_1XpansionTrajectoryInvalidArguments.html":[46,0,1,0,0],
 "classargs__parser__trajectory_1_1TrajectoryLauncherOptionsDefaultValues.html":[46,0,1,1],
 "classargs__parser__trajectory_1_1TrajectoryLauncherOptionsKeys.html":[46,0,1,2],
-"classclass.html":[46,0,87],
+"classclass.html":[46,0,98],
 "classdriver__input__translation_1_1InputTranslationDriver.html":[46,0,3,0],
 "classdriver__input__translation_1_1InputTranslationDriver.html#a31f3e404a8968adc01790753dceb0f12":[46,0,3,0,1],
 "classdriver__input__translation_1_1InputTranslationDriver.html#aa6a8becca2bbdac89c7ab33c0e0818be":[46,0,3,0,2],
@@ -240,14 +249,5 @@ var NAVTREEINDEX5 =
 "classdriver__multiple__problem__gen_1_1MultipleProblemGenerationDriver.html#a1a4c82a04507b09c9b798f4f7d216e0c":[46,0,6,1,3],
 "classdriver__multiple__problem__gen_1_1MultipleProblemGenerationDriver.html#a51791f3658d80c52a39eea431fd93cb1":[46,0,6,1,2],
 "classdriver__multiple__problem__gen_1_1MultipleProblemGenerationDriver.html#aabe5078bb00d702baa98a117c8a56731":[46,0,6,1,4],
-"classdriver__multiple__problem__gen_1_1MultipleProblemGenerationDriver.html#ac902f00ebffb0146fa51221007eaba69":[46,0,6,1,5],
-"classdriver__multiple__problem__gen_1_1MultipleProblemGenerationDriver_1_1MultipleProblemGenerationExeError.html":[46,0,6,1,1],
-"classdriver__multiple__problem__gen_1_1MultipleProblemGenerationDriver_1_1MultipleProblemGenerationExecutionError.html":[46,0,6,1,0],
-"classdriver__resolution_1_1TrajectoryResolutionData.html":[46,0,7,0],
-"classdriver__resolution_1_1TrajectoryResolutionDriver.html":[46,0,7,1],
-"classdriver__resolution_1_1TrajectoryResolutionDriver.html#a1b25c911352ddd15806ffaf5b800cf92":[46,0,7,1,2],
-"classdriver__resolution_1_1TrajectoryResolutionDriver.html#a7fdf9f544e54dc0a7dd8434c2a30f52e":[46,0,7,1,0],
-"classdriver__resolution_1_1TrajectoryResolutionDriver.html#a8bb5af1bcbd89fc5618e4a8736da433d":[46,0,7,1,1],
-"classdriver__trajectory_1_1TrajectoryInvestmentDriver.html":[44,0,1,0],
-"classdriver__trajectory_1_1TrajectoryInvestmentDriver.html":[46,0,8,0]
+"classdriver__multiple__problem__gen_1_1MultipleProblemGenerationDriver.html#ac902f00ebffb0146fa51221007eaba69":[46,0,6,1,5]
 };

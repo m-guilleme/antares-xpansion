@@ -9,6 +9,5 @@ var searchData=
   ['reservoir_6',['Reservoir',['../classReservoir.html#a350ab1cb6b33ba54fbafb0d775127bb7',1,'Reservoir']]],
   ['reset_7',['reset',['../structLinkdataRecord.html#a80fbca65660bf152d9523946037b4e38',1,'LinkdataRecord']]],
   ['restore_5fprob_8',['restore_prob',['../classProblem.html#a89c2613e4954f6d0b01c730ce231c971',1,'Problem::restore_prob()'],['../classSolverAbstract.html#a7028f73741560bc9a5ba54ac03e6c5a7',1,'SolverAbstract::restore_prob()'],['../classSolverXpress.html#a611102535da3de0436c79e9f9746b8e1',1,'SolverXpress::restore_prob()'],['../classSolverCbc.html#abd086f6abf03ea3de51a147ddcd0e8d7',1,'SolverCbc::restore_prob()'],['../classSolverClp.html#a9a0a3850f4a7c77ad12aaf1c19dd2098',1,'SolverClp::restore_prob()'],['../classNOOPSolver.html#a883c3e97cfdb5e35166c553990e0785f',1,'NOOPSolver::restore_prob()']]],
-  ['roundxcut_9',['roundXCut',['../classBendersBase.html#afa9edac4513a89c829bdd69271bf3b50',1,'BendersBase']]],
-  ['run_10',['Run',['../classBendersMpi.html#a497d3f6ee2594fe0e5563635aacf45de',1,'BendersMpi::Run()'],['../classBendersSequential.html#a40aa11a91d67d2fb70a47350fa3230dc',1,'BendersSequential::Run()'],['../classEvaluator.html#ab01955a82723ce73c9c5af70524bc7e6',1,'Evaluator::Run()']]]
+  ['run_9',['Run',['../classEvaluator.html#ab01955a82723ce73c9c5af70524bc7e6',1,'Evaluator']]]
 ];

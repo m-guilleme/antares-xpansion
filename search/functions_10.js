@@ -9,6 +9,5 @@ var searchData=
   ['updatelinkdatafile_6',['updateLinkdataFile',['../classStudyUpdater.html#a9db49727f1ceb8bb7c871dcdb99a099f',1,'StudyUpdater']]],
   ['updateproblems_7',['updateProblems',['../classProblemGenerationForWaterValueCalculation.html#a2f6fa034d3c9fba5349793e896c65304',1,'ProblemGenerationForWaterValueCalculation']]],
   ['updatestoppingcriterion_8',['UpdateStoppingCriterion',['../classBendersByBatch.html#abc79d5e65838ad7a27b352ecfeb0dfa0',1,'BendersByBatch::UpdateStoppingCriterion()'],['../classBendersBase.html#a12e1da335571d21dc124f5d1b2de41e0',1,'BendersBase::UpdateStoppingCriterion()']]],
-  ['updatetrace_9',['UpdateTrace',['../classBendersBase.html#adb953cbbd95d83ed70de4244f975d436',1,'BendersBase::UpdateTrace()'],['../classBendersSequentialDouble.html#a01aa233cda314c1882c9c5ef216d1ea3',1,'BendersSequentialDouble::UpdateTrace()'],['../classBendersBaseDouble.html#a992f815592dc2075d934450f1f9e963f',1,'BendersBaseDouble::UpdateTrace()'],['../classBendersMicroIterationsDouble.html#a2340a46869c103b3e1a0e604caac5f75',1,'BendersMicroIterationsDouble::UpdateTrace()']]],
-  ['updatevalue_10',['updateValue',['../classConfigReader_1_1YAMLElement.html#a15761429b3c54967e49f16cbe70d3d93',1,'ConfigReader::YAMLElement']]]
+  ['updatevalue_9',['updateValue',['../classConfigReader_1_1YAMLElement.html#a15761429b3c54967e49f16cbe70d3d93',1,'ConfigReader::YAMLElement']]]
 ];
