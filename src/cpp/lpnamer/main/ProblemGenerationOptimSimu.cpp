@@ -6,7 +6,9 @@
 
 #include <antares/api/singleProblemGetter.h>
 #include <antares/api/solver.h>
+#include <antares/optimization-options/options.h>
 #include <antares/solver/lps/LpsFromAntares.h>
+#include <antares/solver/variable/registerThematicTrimmingVariables.h>
 
 #include "antares-xpansion/lpnamer/problem_modifier/XpansionProblemsFromAntaresProvider.h"
 #include "malloc.h"
@@ -29,6 +31,10 @@ ProblemGenerationOptimSimu::ProblemGenerationOptimSimu(
 
 void ProblemGenerationOptimSimu::loadProblemsFromAntares()
 {
+    // Since Simulator 10.2.0, every executable loading a study must register the thematic
+    // trimming variables beforehand, otherwise loading the study throws `map::at`
+    Antares::Solver::Variable::RegisterThematicTrimmingVariables();
+
     Antares::Solver::SingleProblemGetter spg(directories.study_dir);
     if (spg.areWeeksIndependent())
     {
@@ -65,7 +71,7 @@ void ProblemGenerationOptimSimu::generateAntaresProblems(Antares::Solver::Single
 
 void ProblemGenerationOptimSimu::performAntaresSimulation()
 {
-    Antares::Solver::Optimization::OptimizationOptions optOptions;
+    Antares::Optimization::OptimizationOptions optOptions;
     optOptions.firstOptimOptions.solverName = problemManager->solverName();
     optOptions.secondOptimOptions.solverName = problemManager->solverName();
 

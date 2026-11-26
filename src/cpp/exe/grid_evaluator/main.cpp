@@ -8,6 +8,7 @@
 #include "antares-xpansion/bellman_values/SettingsConfigReader.h"
 #include "antares-xpansion/benders/factories/LoggerFactories.h"
 #include "antares-xpansion/benders/logger/FilteredLogger.h"
+#include "antares-xpansion/config_reader/ProblemGenerationConfigOptions.h"
 #include "antares-xpansion/evaluator/GridEvaluator.h"
 #include "antares-xpansion/exe_options/CommonExeOptions.h"
 #include "antares-xpansion/lpnamer/main/ProblemGenerationForWaterValueCalculation.h"
@@ -132,10 +133,10 @@ int main(int argc, char** argv)
         const std::string verbosity = scr.getVerbosity();
         const bool cacheProblems = scr.getCacheProblems();
 
-        ConfigurationManager::ConfigDirectories directories{
-          .study_dir = studyPath,
-          .simulation_dir = ConfigurationManager::generateOutputName(studyPath),
-        };
+        ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(studyPath),
+                                                     ProblemFormat::OPTIMIZED);
+        const ConfigurationManager configManager(configOptions);
+        const ConfigurationManager::ConfigDirectories directories = configManager.Directories();
 
         // at this point, the simulation folder is already needed for logs (normally created when
         // updating problems)

@@ -17,6 +17,7 @@
 #include "antares-xpansion/benders/logger/FilteredLogger.h"
 #include "antares-xpansion/benders/logger/Master.h"
 #include "antares-xpansion/benders/logger/User.h"
+#include "antares-xpansion/config_reader/ProblemGenerationConfigOptions.h"
 #include "antares-xpansion/evaluator/GreedyBalancingFinder.h"
 #include "gtest/gtest.h"
 
@@ -136,10 +137,10 @@ protected:
     {
         copyStudyData(studyName);
         const std::shared_ptr<ProblemManager>& problemManager = makeXpressProblemManager();
-        ConfigurationManager::ConfigDirectories directories{
-          .study_dir = tmpDir,
-          .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-        };
+        ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                     ProblemFormat::OPTIMIZED);
+        const ConfigurationManager configManager(configOptions);
+        const ConfigurationManager::ConfigDirectories directories = configManager.Directories();
         InputBalancingParser balParser(
           inputBalFilePath.value_or(tmpDir / "user" / "balancing" / "input_balancing.yml"));
         std::map<std::string, Area> areas = balParser.parse();

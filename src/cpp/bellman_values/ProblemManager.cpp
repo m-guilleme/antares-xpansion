@@ -14,7 +14,7 @@ ProblemManager::ProblemManager(Logger logger,
     solverLogManager_(),
     solverFactory_()
 {
-    setProblemFormat(problemsFormatFromString(problemFormat));
+    setProblemFormat(problemFormatFromString(problemFormat));
     if ((cacheProblems || writePbFiles) && problemsPath == std::nullopt)
     {
         throw std::runtime_error(
@@ -77,10 +77,10 @@ std::shared_ptr<Problem> ProblemManager::readProblemFromDisk(const std::string& 
         // std::cout << "New problem created\n";
         switch (problemFormat_)
         {
-        case ProblemsFormat::MPS_FILE:
+        case ProblemFormat::MPS_FILE:
             problem->read_prob_mps(problemsPath_.value() / (problemName + ".mps"));
             break;
-        case ProblemsFormat::OPTIMIZED:
+        case ProblemFormat::OPTIMIZED:
             problem->restore_prob(problemsPath_.value() / (problemName + ".svf"));
             break;
             // potential errors are handled by
@@ -114,10 +114,10 @@ void ProblemManager::saveProblemToFile(const Antares::Solver::WeeklyProblemId& p
 {
     switch (problemFormat_)
     {
-    case ProblemsFormat::MPS_FILE:
+    case ProblemFormat::MPS_FILE:
         problem->write_prob_mps(folder / (getPbNameFromId(pbId) + ".mps"));
         break;
-    case ProblemsFormat::OPTIMIZED:
+    case ProblemFormat::OPTIMIZED:
         problem->save_prob(folder / (getPbNameFromId(pbId) + ".svf"));
         break;
         // potential errors are handled by

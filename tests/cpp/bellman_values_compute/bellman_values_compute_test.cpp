@@ -4,6 +4,7 @@
 #include "antares-xpansion/benders/logger/FilteredLogger.h"
 #include "antares-xpansion/benders/logger/Master.h"
 #include "antares-xpansion/benders/logger/User.h"
+#include "antares-xpansion/config_reader/ProblemGenerationConfigOptions.h"
 #include "antares-xpansion/lpnamer/main/ConfigurationManager.h"
 #include "antares-xpansion/lpnamer/main/ProblemGenerationForWaterValueCalculation.h"
 #include "gtest/gtest.h"
@@ -262,10 +263,10 @@ TEST_F(BellmanValuesComputeTest, OneNodeBaseCaseNoPenalties)
     auto grid = grid_collection.gridDefinitions.at(0);
     ReservoirManagement reservoir_management(grid_collection.reservoirs.begin()->second, 0, 0, 0);
 
-    ConfigurationManager::ConfigDirectories config_dirs{
-      .study_dir = tmpDir,
-      .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories config_dirs = configManager.Directories();
 
     auto problemManager = std::make_shared<ProblemManager>(logger,
                                                            solverName,
@@ -309,10 +310,10 @@ TEST_F(BellmanValuesComputeTest, OneNodeBaseCasePenalties)
                                              3000,
                                              3000);
 
-    ConfigurationManager::ConfigDirectories config_dirs{
-      .study_dir = tmpDir,
-      .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories config_dirs = configManager.Directories();
 
     auto problemManager = std::make_shared<ProblemManager>(logger,
                                                            solverName,
@@ -357,10 +358,10 @@ TEST_F(BellmanValuesComputeTest, OneNodeBaseCasePenaltiesWithFinalLevel)
                                              3000,
                                              true);
 
-    ConfigurationManager::ConfigDirectories config_dirs{
-      .study_dir = tmpDir,
-      .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories config_dirs = configManager.Directories();
 
     auto problemManager = std::make_shared<ProblemManager>(logger,
                                                            solverName,
@@ -399,10 +400,10 @@ TEST_F(BellmanValuesComputeTest, ThreeNodesCaseNoPenalties)
     auto grid_collection = std::make_shared<GridCollection>(
       GridCollection(tmpDir / "user/water_values/grid.csv", logger));
 
-    ConfigurationManager::ConfigDirectories config_dirs{
-      .study_dir = tmpDir,
-      .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories config_dirs = configManager.Directories();
 
     auto problemManager = std::make_shared<ProblemManager>(logger,
                                                            solverNameMultistock,
@@ -484,10 +485,10 @@ TEST_F(BellmanValuesComputeTest, ThreeNodesCaseWithPenalties)
     auto grid_collection = std::make_shared<GridCollection>(
       GridCollection(tmpDir / "user/water_values/grid.csv", logger));
 
-    ConfigurationManager::ConfigDirectories config_dirs{
-      .study_dir = tmpDir,
-      .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories config_dirs = configManager.Directories();
 
     auto problemManager = std::make_shared<ProblemManager>(logger,
                                                            solverNameMultistock,
@@ -569,10 +570,10 @@ TEST_F(BellmanValuesComputeTest, ThreeNodesCaseWithPenaltiesFinalLevel)
     auto grid_collection = std::make_shared<GridCollection>(
       GridCollection(tmpDir / "user/water_values/grid.csv", logger));
 
-    ConfigurationManager::ConfigDirectories config_dirs{
-      .study_dir = tmpDir,
-      .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories config_dirs = configManager.Directories();
 
     auto problemManager = std::make_shared<ProblemManager>(logger,
                                                            solverNameMultistock,

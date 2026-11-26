@@ -53,7 +53,7 @@ public:
         return writePbFiles_;
     }
 
-    ProblemsFormat problemFormat() const
+    ProblemFormat problemFormat() const
     {
         return problemFormat_;
     }
@@ -150,13 +150,13 @@ public:
 private:
     std::shared_ptr<Problem> readProblemFromDisk(const std::string& problemName) const;
 
-    void setProblemFormat(const ProblemsFormat& problemFormat)
+    void setProblemFormat(const ProblemFormat& problemFormat)
     {
-        if (solverName_ != SolverConfig("xpress") && problemFormat == ProblemsFormat::OPTIMIZED)
+        if (solverName_ != SolverConfig("xpress") && problemFormat == ProblemFormat::OPTIMIZED)
         {
             logger_->display_message("The optimized problem format is only compatible with Xpress "
                                      "solver. MPS format will be used.");
-            problemFormat_ = ProblemsFormat::MPS_FILE;
+            problemFormat_ = ProblemFormat::MPS_FILE;
         }
         else
         {
@@ -169,7 +169,7 @@ private:
                                  // from/saved on disk instead of in memory
     bool writePbFiles_ = false;  // save problem files to disk, for analysis purposes for example
     std::string solverName_ = "xpress";
-    ProblemsFormat problemFormat_ = ProblemsFormat::OPTIMIZED; // can be MPS_FILE or OPTIMIZED (SVF)
+    ProblemFormat problemFormat_ = ProblemFormat::OPTIMIZED; // can be MPS_FILE or OPTIMIZED (SVF)
     std::map<Antares::Solver::WeeklyProblemId, std::shared_ptr<Problem>>
       problems_;                                            // a map storing all problems
     std::set<Antares::Solver::WeeklyProblemId> problemIds_; // a set holding all problem Ids

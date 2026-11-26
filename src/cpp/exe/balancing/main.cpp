@@ -15,6 +15,7 @@
 #include "antares-xpansion/balancing/utils.h"
 #include "antares-xpansion/bellman_values/ProblemManager.h"
 #include "antares-xpansion/benders/logger/MultithreadTBBLogger.h"
+#include "antares-xpansion/config_reader/ProblemGenerationConfigOptions.h"
 #include "antares-xpansion/evaluator/GreedyBalancingFinder.h"
 #include "antares-xpansion/exe_options/CommonExeOptions.h"
 #include "antares-xpansion/lpnamer/main/Balancing.h"
@@ -91,10 +92,10 @@ int runBalancing(int argc, char** argv)
     Benders::Criterion::Type relibilityStandardIndicator = inputBalancingParser
                                                              .getReliabilityStandardIndicator();
 
-    const ConfigurationManager::ConfigDirectories directories{
-      .study_dir = studyPath,
-      .simulation_dir = ConfigurationManager::generateOutputName(studyPath),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(studyPath),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories directories = configManager.Directories();
     std::filesystem::create_directories(directories.simulation_dir);
 
     const auto logger = createLogger(directories.simulation_dir, nbThreads, verbosity);
