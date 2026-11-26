@@ -22,8 +22,9 @@ target_link_libraries (water_values
 		${PROJECT_NAME}::lp_namer_helper
 		${PROJECT_NAME}::evaluator_lib
 		${PROJECT_NAME}::bellman_values_lib
+		${PROJECT_NAME}::exe_options_lib
 		${PROJECT_NAME}::factories
-		
+		${PROJECT_NAME}::exe_options_lib
 )
 
 install(TARGETS water_values DESTINATION bin)

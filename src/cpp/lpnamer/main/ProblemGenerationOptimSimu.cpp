@@ -6,6 +6,9 @@
 
 #include <antares/api/singleProblemGetter.h>
 #include <antares/api/solver.h>
+#include <antares/optimization-options/options.h>
+#include <antares/solver/lps/LpsFromAntares.h>
+#include <antares/solver/variable/registerThematicTrimmingVariables.h>
 
 #include "antares-xpansion/lpnamer/problem_modifier/XpansionProblemsFromAntaresProvider.h"
 #include "malloc.h"
@@ -18,16 +21,20 @@ ProblemGenerationOptimSimu::ProblemGenerationOptimSimu(
   unsigned int startWeek,
   unsigned int endWeek):
     directories(directories),
-    logger(std::move(logger)),
-    problemManager(problemManager),
     startWeek(startWeek),
-    endWeek(endWeek)
+    endWeek(endWeek),
+    problemManager(problemManager),
+    logger(std::move(logger))
 {
     loadProblemsFromAntares();
 }
 
 void ProblemGenerationOptimSimu::loadProblemsFromAntares()
 {
+    // Since Simulator 10.2.0, every executable loading a study must register the thematic
+    // trimming variables beforehand, otherwise loading the study throws `map::at`
+    Antares::Solver::Variable::RegisterThematicTrimmingVariables();
+
     Antares::Solver::SingleProblemGetter spg(directories.study_dir);
     if (spg.areWeeksIndependent())
     {
@@ -64,7 +71,7 @@ void ProblemGenerationOptimSimu::generateAntaresProblems(Antares::Solver::Single
 
 void ProblemGenerationOptimSimu::performAntaresSimulation()
 {
-    Antares::Solver::Optimization::OptimizationOptions optOptions;
+    Antares::Optimization::OptimizationOptions optOptions;
     optOptions.firstOptimOptions.solverName = problemManager->solverName();
     optOptions.secondOptimOptions.solverName = problemManager->solverName();
 
@@ -105,10 +112,11 @@ void ProblemGenerationOptimSimu::lpsToProblems(const Antares::Solver::LpsFromAnt
         problemManager->setProblem(pbId, problem);
     }
 
-    auto problems = problemManager->getProblems();
-    if (!problems.empty())
+    if (!problemManager->getProblemIds().empty())
     {
-        startWeek = std::max(startWeek, problems.begin()->first.week);
-        endWeek = std::min(endWeek, problems.rbegin()->first.week);
+        startWeek = std::max(startWeek, problemManager->getFirstProblem()->week);
+        std::shared_ptr<Problem> lastProblem = problemManager->getProblemFromId(
+          *(problemManager->getProblemIds().rbegin()));
+        endWeek = std::min(endWeek, lastProblem->week);
     }
 }

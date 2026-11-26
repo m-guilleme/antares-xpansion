@@ -1,0 +1,25 @@
+iteration,zone,criteria,action,cluster candidate,capacity change
+1,area1,HIGHER,INVESTMENT,invest_peak,500
+1,area2,HIGHER,INVESTMENT,invest_peak2,500
+2,area1,HIGHER,INVESTMENT,invest_semibase1,500
+2,area2,HIGHER,INVESTMENT,invest_semibase,500
+3,area1,HIGHER,INVESTMENT,invest_peak,500
+3,area2,HIGHER,INVESTMENT,invest_peak2,500
+4,area1,HIGHER,INVESTMENT,invest_semibase1,500
+4,area2,HIGHER,INVESTMENT,invest_semibase,500
+5,area1,LOWER,DISINVESTMENT,invest_semibase1,-450
+5,area2,HIGHER,INVESTMENT,invest_peak2,500
+6,area1,HIGHER,INVESTMENT,invest_semibase1,400
+6,area2,HIGHER,INVESTMENT,invest_peak2,500
+7,area1,LOWER,DISINVESTMENT,invest_semibase1,-350
+7,area2,HIGHER,INVESTMENT,invest_peak2,500
+8,area1,HIGHER,INVESTMENT,invest_semibase1,300
+9,area1,LOWER,DISINVESTMENT,invest_semibase1,-250
+9,area2,LOWER,DISINVESTMENT,invest_semibase,-450
+10,area1,HIGHER,INVESTMENT,invest_semibase1,200
+10,area2,HIGHER,INVESTMENT,invest_semibase,400
+11,area1,LOWER,DISINVESTMENT,invest_semibase1,-150
+11,area2,HIGHER,INVESTMENT,invest_peak2,400
+12,area1,LOWER,DISINVESTMENT,invest_semibase1,-150
+12,area2,LOWER,DISINVESTMENT,invest_semibase,-350
+13,area1,HIGHER,INVESTMENT,invest_semibase1,100

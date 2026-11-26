@@ -1,0 +1,6 @@
+area name,candidate name,capacity,capacity change
+area1,invest_peak,1600,1600
+area1,invest_semibase1,550,550
+area2,invest_peak2,0,0
+area2,invest_semibase,2800,0
+area2,unprofitable_peak,400,-4600

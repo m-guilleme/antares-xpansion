@@ -1,4 +1,20 @@
+
 #include "include/antares-xpansion/bellman_values/DynamicProgrammingConfigReader.h"
+
+#include <algorithm>
+#include <ranges>
+
+namespace
+{
+std::string toLower(std::string_view text)
+{
+    std::string lower(text);
+    std::ranges::transform(lower,
+                           lower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lower;
+}
+} // namespace
 
 void DynamicProgrammingConfigReader::emplaceAllElements()
 {
@@ -23,7 +39,7 @@ void DynamicProgrammingConfigReader::parsePenaltiesByArea()
         {
             if (penaltiesNode.second)
             {
-                std::string areaName = penaltiesNode.first.as<std::string>();
+                std::string areaName = toLower(penaltiesNode.first.as<std::string>());
                 std::cout << "Parsing penalty for area " << areaName << std::endl;
                 // instantiating penalty with default values
                 std::map<std::string, YAMLElement> penalty = instantiatePenalty();
@@ -53,6 +69,34 @@ void DynamicProgrammingConfigReader::parsePenaltiesByArea()
     }
     // a default penalty must be instantiated in case a required area is not present in the file
     defaultPenalty_ = instantiatePenalty();
+}
+
+void DynamicProgrammingConfigReader::checkInputs()
+{
+    // root level: global parameters and the penalties section
+    checkUnknownKeys({penaltiesKey});
+
+    // penalties section: each area may only contain penalty keys
+    const YAML::Node& root = config_; // const access, so that operator[] does not modify config_
+    if (root.IsMap() && root[penaltiesKey] && root[penaltiesKey].IsMap())
+    {
+        for (const auto& areaNode: root[penaltiesKey])
+        {
+            checkUnknownKeysInNode(areaNode.second,
+                                   defaultPenalty_,
+                                   {},
+                                   penaltiesKey + "/" + areaNode.first.as<std::string>());
+        }
+    }
+
+    for (const auto& [areaName, areaPenalties]: penalties_)
+    {
+        auto finalLevel = getValueFromKey<std::optional<double>>(finalLevelKey, areaPenalties);
+        if (finalLevel.has_value() && (0 > finalLevel || finalLevel > 1))
+        {
+            throw std::runtime_error("Final level for " + areaName + " must be between 0 and 1.");
+        }
+    }
 }
 
 std::map<std::string, ConfigReader::YAMLElement>

@@ -1,7 +1,9 @@
 #pragma once
 
+#include "ConstraintsGroup.h"
 #include "CriterionInputDataReader.h"
 #include "VariablesGroup.h"
+#include "antares-xpansion/multisolver_interface/SolverAbstract.h"
 
 namespace Benders::Criterion
 {
@@ -38,6 +40,18 @@ public:
     void SearchVariables(const std::vector<std::string>& variables);
 
     /**
+     * @brief Searches for relevant constraints based on the provided constraint
+     * names.
+     *
+     * This method initializes a VariablesGroup with the provided constraint names
+     * and retrieves the indices of these constraints for later computation.
+     *
+     * @param constraints A vector of strings representing the constraint names to
+     * search for.
+     */
+    void SearchConstraints(const std::vector<std::string>& constraints);
+
+    /**
      * @brief Computes the  criteria based on subproblem solutions.
      *
      * This method calculates the criterion criteria and pattern values
@@ -46,8 +60,8 @@ public:
      *
      * @param subproblem_weight The weight of the subproblem affecting the
      * criteria.
-     * @param sub_problem_solution A vector containing the solutions of the
-     * subproblem.
+     * @param sub_problem_solution A vector containing the solution values of
+     * the subproblem.
      * @param criteria A reference to a vector where the computed
      * criteria will be stored.
      * @param patterns_values A reference to a vector where the computed
@@ -57,6 +71,26 @@ public:
                           const std::vector<double>& sub_problem_solution,
                           std::vector<double>& criteria,
                           std::vector<double>& patterns_values);
+
+    /**
+     * @brief Computes the criteria directly from an already solved problem.
+     *
+     * Default behaviour: retrieves the primal solution of the problem and
+     * calls ComputeCriterion. Criterion-specific classes (LOLE, UNSPENERG,
+     * NPCAP) override it.
+     *
+     * @param problem The already solved problem
+     * @param subproblem_weight The weight of the subproblem affecting the
+     * criteria.
+     * @param criteria A reference to a vector where the computed
+     * criteria will be stored.
+     * @param patterns_values A reference to a vector where the computed
+     * pattern values will be stored.
+     */
+    virtual void ComputeCriterionFromProblem(std::shared_ptr<SolverAbstract> problem,
+                                             double subproblem_weight,
+                                             std::vector<double>& criteria,
+                                             std::vector<double>& patterns_values);
 
     /**
      * @brief Retrieves the variable indices.
@@ -83,7 +117,11 @@ public:
         return criterion_input_data_.Criteria().empty();
     }
 
-private:
+    void SetCriterionCountThreshold(double count_threshold);
+
+    virtual ~CriterionComputation() = default;
+
+protected:
     std::vector<std::vector<int>> var_indices_ = {};
     CriterionInputData criterion_input_data_;
 };

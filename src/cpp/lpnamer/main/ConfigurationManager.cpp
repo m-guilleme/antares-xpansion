@@ -115,7 +115,8 @@ std::string getCurrentTimestamp()
 }
 } // namespace
 
-std::filesystem::path ConfigurationManager::generateOutputName(const std::filesystem::path& study)
+std::filesystem::path ConfigurationManager::generateOutputName(
+  const std::filesystem::path& study) const
 {
     auto name = study / "output" / getCurrentTimestamp();
     if (std::filesystem::exists(name))

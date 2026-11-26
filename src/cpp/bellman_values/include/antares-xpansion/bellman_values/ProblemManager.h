@@ -14,7 +14,8 @@ class ProblemManager
 {
 public:
     // TODO: add a logger
-    ProblemManager(const std::string& solverName = "xpress",
+    ProblemManager(Logger logger,
+                   const std::string& solverName = "xpress",
                    const std::string& problemFormat = "OPTIMIZED",
                    bool writePbFiles = false,
                    bool cacheProblems = false,
@@ -25,19 +26,18 @@ public:
     ~ProblemManager();
 
     /**
-     * @brief Get the Problems object, either read from disk or as stored in memory.
+     * @brief Get the first problem of the set, either read from disk or as stored in memory.
      *
-     * @return std::map<Antares::Solver::WeeklyProblemId, std::shared_ptr<Problem>>
+     * @return std::shared_ptr<Problem>
      */
-    const std::map<Antares::Solver::WeeklyProblemId, std::shared_ptr<Problem>>& getProblems() const
+    std::shared_ptr<Problem> getFirstProblem() const
     {
-        return problems_;
-        // todo: read from disk
+        return getProblemFromId(*problemIds_.begin());
     }
 
     std::set<Antares::Solver::WeeklyProblemId> getProblemIds() const
     {
-        return problemIds;
+        return problemIds_;
     }
 
     /**
@@ -53,7 +53,7 @@ public:
         return writePbFiles_;
     }
 
-    ProblemsFormat problemFormat() const
+    ProblemFormat problemFormat() const
     {
         return problemFormat_;
     }
@@ -101,7 +101,7 @@ public:
 
     void setProblem(const Antares::Solver::WeeklyProblemId& pbId, std::shared_ptr<Problem> pb)
     {
-        problemIds.emplace(pbId);
+        problemIds_.emplace(pbId);
         if (cacheProblems_ || writePbFiles_)
         {
             // problems are written to disk
@@ -114,9 +114,33 @@ public:
         }
     }
 
+    void setProblemSolution(const Antares::Solver::WeeklyProblemId& pbId,
+                            const std::vector<double>& solution)
+    {
+        solutions_[pbId] = solution;
+    }
+
+    void storeProblemSolution(std::shared_ptr<Problem> problem)
+    {
+        std::vector<double> solution(problem->get_ncols());
+        problem->get_lp_sol(solution.data(), NULL, NULL);
+        setProblemSolution({problem->mc_year, problem->week}, solution);
+    }
+
+    /// @brief returns the solution to a problem either from the local solution map (if
+    /// cacheProblems), or from the problem itself
+    /// @param pbId
+    /// @return std::vector<double> Solution of the problem
+    std::vector<double> getProblemSolution(const Antares::Solver::WeeklyProblemId& pbId) const;
+
     void setProblemsPath(const std::filesystem::path& problemsPath)
     {
         problemsPath_ = problemsPath;
+    }
+
+    const std::filesystem::path getProblemsPath() const
+    {
+        return problemsPath_.value_or("");
     }
 
     void saveProblemToFile(const Antares::Solver::WeeklyProblemId& pbId,
@@ -126,19 +150,13 @@ public:
 private:
     std::shared_ptr<Problem> readProblemFromDisk(const std::string& problemName) const;
 
-    void setProblemFormat(const ProblemsFormat& problemFormat)
+    void setProblemFormat(const ProblemFormat& problemFormat)
     {
-        if (solverName_ != "xpress" && problemFormat == ProblemsFormat::OPTIMIZED)
+        if (solverName_ != SolverConfig("xpress") && problemFormat == ProblemFormat::OPTIMIZED)
         {
-            std::cout << "The optimized problem format is only compatible with Xpress solver. MPS "
-                         "format will be used.\n";
-            problemFormat_ = ProblemsFormat::MPS_FILE;
-        }
-        else if (!writePbFiles_)
-        {
-            std::cout << "Problem files are not required to be kept on disk - optimized svf files "
-                         "are used.\n";
-            problemFormat_ = ProblemsFormat::OPTIMIZED;
+            logger_->display_message("The optimized problem format is only compatible with Xpress "
+                                     "solver. MPS format will be used.");
+            problemFormat_ = ProblemFormat::MPS_FILE;
         }
         else
         {
@@ -146,14 +164,17 @@ private:
         }
     }
 
+    Logger logger_;
     bool cacheProblems_ = false; // for optimization purposes, problems can be read
                                  // from/saved on disk instead of in memory
     bool writePbFiles_ = false;  // save problem files to disk, for analysis purposes for example
     std::string solverName_ = "xpress";
-    ProblemsFormat problemFormat_ = ProblemsFormat::OPTIMIZED; // can be MPS_FILE or OPTIMIZED (SVF)
+    ProblemFormat problemFormat_ = ProblemFormat::OPTIMIZED; // can be MPS_FILE or OPTIMIZED (SVF)
     std::map<Antares::Solver::WeeklyProblemId, std::shared_ptr<Problem>>
-      problems_;                                           // a map storing all problems
-    std::set<Antares::Solver::WeeklyProblemId> problemIds; // a set holding all problem Ids
+      problems_;                                            // a map storing all problems
+    std::set<Antares::Solver::WeeklyProblemId> problemIds_; // a set holding all problem Ids
+    std::map<Antares::Solver::WeeklyProblemId, std::vector<double>>
+      solutions_; // a map of solutions for all problems
     std::optional<std::filesystem::path>
       problemsPath_ = std::nullopt;     // needed only when reading problems from disk
     SolverFactory solverFactory_;       // needed to construct problems from disk

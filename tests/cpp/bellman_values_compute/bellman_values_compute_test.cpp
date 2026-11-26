@@ -4,6 +4,7 @@
 #include "antares-xpansion/benders/logger/FilteredLogger.h"
 #include "antares-xpansion/benders/logger/Master.h"
 #include "antares-xpansion/benders/logger/User.h"
+#include "antares-xpansion/config_reader/ProblemGenerationConfigOptions.h"
 #include "antares-xpansion/lpnamer/main/ConfigurationManager.h"
 #include "antares-xpansion/lpnamer/main/ProblemGenerationForWaterValueCalculation.h"
 #include "gtest/gtest.h"
@@ -214,8 +215,8 @@ protected:
 TEST_F(BellmanValuesComputeTest, unitTestNoPenalties)
 {
     ReservoirManagement reservoirManagement(evaluatorMock.reservoirMock, 0, 0, 0);
-    auto [bellmanValues,
-          costs] = BellmanValues(evaluatorMock, reservoirManagement, logger).compute(6);
+    auto [bellmanValues, costs] = BellmanValues(evaluatorMock, reservoirManagement, logger)
+                                    .compute(6);
 
     std::vector<std::vector<double>> expected = {{180, 140, 100, 60, 60, 60},
                                                  {120, 80, 40, 40, 40, 40},
@@ -228,8 +229,8 @@ TEST_F(BellmanValuesComputeTest, unitTestNoPenalties)
 TEST_F(BellmanValuesComputeTest, unitTestPenalties)
 {
     ReservoirManagement reservoirManagement(evaluatorMock.reservoirMock, 10, 10, 0);
-    auto [bellmanValues,
-          costs] = BellmanValues(evaluatorMock, reservoirManagement, logger).compute(6);
+    auto [bellmanValues, costs] = BellmanValues(evaluatorMock, reservoirManagement, logger)
+                                    .compute(6);
 
     std::vector<std::vector<double>> expected = {{1220, 180, 140, 100, 60, 1060},
                                                  {1160, 120, 80, 40, 40, 1040},
@@ -241,9 +242,9 @@ TEST_F(BellmanValuesComputeTest, unitTestPenalties)
 
 TEST_F(BellmanValuesComputeTest, unitTestPenaltiesWithFinalLevel)
 {
-    ReservoirManagement reservoirManagement(evaluatorMock.reservoirMock, 10, 10, 30, true, 400);
-    auto [bellmanValues,
-          costs] = BellmanValues(evaluatorMock, reservoirManagement, logger).compute(6);
+    ReservoirManagement reservoirManagement(evaluatorMock.reservoirMock, 10, 10, 30, true, 0.8);
+    auto [bellmanValues, costs] = BellmanValues(evaluatorMock, reservoirManagement, logger)
+                                    .compute(6);
 
     std::vector<std::vector<double>> expected = {{4300, 300, 260, 220, 180, 1140},
                                                  {7200, 3200, 200, 160, 120, 1080},
@@ -262,12 +263,13 @@ TEST_F(BellmanValuesComputeTest, OneNodeBaseCaseNoPenalties)
     auto grid = grid_collection.gridDefinitions.at(0);
     ReservoirManagement reservoir_management(grid_collection.reservoirs.begin()->second, 0, 0, 0);
 
-    ConfigurationManager::ConfigDirectories config_dirs{
-      .study_dir = tmpDir,
-      .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories config_dirs = configManager.Directories();
 
-    auto problemManager = std::make_shared<ProblemManager>(solverName,
+    auto problemManager = std::make_shared<ProblemManager>(logger,
+                                                           solverName,
                                                            "MPS",
                                                            false,
                                                            true,
@@ -308,12 +310,13 @@ TEST_F(BellmanValuesComputeTest, OneNodeBaseCasePenalties)
                                              3000,
                                              3000);
 
-    ConfigurationManager::ConfigDirectories config_dirs{
-      .study_dir = tmpDir,
-      .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories config_dirs = configManager.Directories();
 
-    auto problemManager = std::make_shared<ProblemManager>(solverName,
+    auto problemManager = std::make_shared<ProblemManager>(logger,
+                                                           solverName,
                                                            "MPS",
                                                            false,
                                                            true,
@@ -355,12 +358,13 @@ TEST_F(BellmanValuesComputeTest, OneNodeBaseCasePenaltiesWithFinalLevel)
                                              3000,
                                              true);
 
-    ConfigurationManager::ConfigDirectories config_dirs{
-      .study_dir = tmpDir,
-      .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories config_dirs = configManager.Directories();
 
-    auto problemManager = std::make_shared<ProblemManager>(solverName,
+    auto problemManager = std::make_shared<ProblemManager>(logger,
+                                                           solverName,
                                                            "MPS",
                                                            false,
                                                            true,
@@ -396,12 +400,13 @@ TEST_F(BellmanValuesComputeTest, ThreeNodesCaseNoPenalties)
     auto grid_collection = std::make_shared<GridCollection>(
       GridCollection(tmpDir / "user/water_values/grid.csv", logger));
 
-    ConfigurationManager::ConfigDirectories config_dirs{
-      .study_dir = tmpDir,
-      .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories config_dirs = configManager.Directories();
 
-    auto problemManager = std::make_shared<ProblemManager>(solverNameMultistock,
+    auto problemManager = std::make_shared<ProblemManager>(logger,
+                                                           solverNameMultistock,
                                                            "MPS",
                                                            false,
                                                            true,
@@ -467,8 +472,8 @@ TEST_F(BellmanValuesComputeTest, ThreeNodesCaseNoPenalties)
         grid_collection->reservoirs.at(grid.area) = reservoir_management.reservoir;
 
         logger->display_message("Computing optimal trajectories...");
-        grid_collection->reservoirs.at(grid.area)
-          .optimal_trajectory = bellmanValues.computeOptimalTrajectories();
+        grid_collection->reservoirs.at(grid.area).optimal_trajectory
+          = bellmanValues.computeOptimalTrajectories();
         logger->display_message("Computing done");
     }
 }
@@ -480,12 +485,13 @@ TEST_F(BellmanValuesComputeTest, ThreeNodesCaseWithPenalties)
     auto grid_collection = std::make_shared<GridCollection>(
       GridCollection(tmpDir / "user/water_values/grid.csv", logger));
 
-    ConfigurationManager::ConfigDirectories config_dirs{
-      .study_dir = tmpDir,
-      .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories config_dirs = configManager.Directories();
 
-    auto problemManager = std::make_shared<ProblemManager>(solverNameMultistock,
+    auto problemManager = std::make_shared<ProblemManager>(logger,
+                                                           solverNameMultistock,
                                                            "MPS",
                                                            false,
                                                            true,
@@ -551,8 +557,8 @@ TEST_F(BellmanValuesComputeTest, ThreeNodesCaseWithPenalties)
         grid_collection->reservoirs.at(grid.area) = reservoir_management.reservoir;
 
         logger->display_message("Computing optimal trajectories...");
-        grid_collection->reservoirs.at(grid.area)
-          .optimal_trajectory = bellmanValues.computeOptimalTrajectories();
+        grid_collection->reservoirs.at(grid.area).optimal_trajectory
+          = bellmanValues.computeOptimalTrajectories();
         logger->display_message("Computing done");
     }
 }
@@ -564,12 +570,13 @@ TEST_F(BellmanValuesComputeTest, ThreeNodesCaseWithPenaltiesFinalLevel)
     auto grid_collection = std::make_shared<GridCollection>(
       GridCollection(tmpDir / "user/water_values/grid.csv", logger));
 
-    ConfigurationManager::ConfigDirectories config_dirs{
-      .study_dir = tmpDir,
-      .simulation_dir = ConfigurationManager::generateOutputName(tmpDir),
-    };
+    ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(tmpDir),
+                                                 ProblemFormat::OPTIMIZED);
+    const ConfigurationManager configManager(configOptions);
+    const ConfigurationManager::ConfigDirectories config_dirs = configManager.Directories();
 
-    auto problemManager = std::make_shared<ProblemManager>(solverNameMultistock,
+    auto problemManager = std::make_shared<ProblemManager>(logger,
+                                                           solverNameMultistock,
                                                            "MPS",
                                                            false,
                                                            true,
@@ -639,8 +646,8 @@ TEST_F(BellmanValuesComputeTest, ThreeNodesCaseWithPenaltiesFinalLevel)
         grid_collection->reservoirs.at(grid.area) = reservoir_management.reservoir;
 
         logger->display_message("Computing optimal trajectories...");
-        grid_collection->reservoirs.at(grid.area)
-          .optimal_trajectory = bellmanValues.computeOptimalTrajectories();
+        grid_collection->reservoirs.at(grid.area).optimal_trajectory
+          = bellmanValues.computeOptimalTrajectories();
         logger->display_message("Computing done");
     }
 }

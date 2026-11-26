@@ -1,10 +1,12 @@
 #include "antares-xpansion/bellman_values/ProblemManager.h"
 
-ProblemManager::ProblemManager(const std::string& solverName,
+ProblemManager::ProblemManager(Logger logger,
+                               const std::string& solverName,
                                const std::string& problemFormat,
                                bool writePbFiles,
                                bool cacheProblems,
                                std::optional<std::filesystem::path> problemsPath):
+    logger_(std::move(logger)),
     solverName_(solverName),
     writePbFiles_(writePbFiles),
     cacheProblems_(cacheProblems),
@@ -12,8 +14,8 @@ ProblemManager::ProblemManager(const std::string& solverName,
     solverLogManager_(),
     solverFactory_()
 {
-    setProblemFormat(problemsFormatFromString(problemFormat));
-    if (cacheProblems && problemsPath == std::nullopt)
+    setProblemFormat(problemFormatFromString(problemFormat));
+    if ((cacheProblems || writePbFiles) && problemsPath == std::nullopt)
     {
         throw std::runtime_error(
           "Error: trying to stream problems from disk without specifying a folder.");
@@ -25,7 +27,8 @@ ProblemManager::ProblemManager(const std::string& solverName,
 }
 
 ProblemManager::ProblemManager(const ProblemManager& problemManagerToCopy):
-    ProblemManager(problemManagerToCopy.solverName_,
+    ProblemManager(std::move(problemManagerToCopy.logger_),
+                   problemManagerToCopy.solverName_,
                    "OPTIMIZED",
                    problemManagerToCopy.writePbFiles_,
                    problemManagerToCopy.cacheProblems_,
@@ -50,7 +53,7 @@ void ProblemManager::setProblems(
   std::map<Antares::Solver::WeeklyProblemId, std::shared_ptr<Problem>>& problems)
 {
     problems_.clear();
-    problemIds.clear();
+    problemIds_.clear();
 
     for (auto& [pbId, problem]: problems)
     {
@@ -74,10 +77,10 @@ std::shared_ptr<Problem> ProblemManager::readProblemFromDisk(const std::string& 
         // std::cout << "New problem created\n";
         switch (problemFormat_)
         {
-        case ProblemsFormat::MPS_FILE:
+        case ProblemFormat::MPS_FILE:
             problem->read_prob_mps(problemsPath_.value() / (problemName + ".mps"));
             break;
-        case ProblemsFormat::OPTIMIZED:
+        case ProblemFormat::OPTIMIZED:
             problem->restore_prob(problemsPath_.value() / (problemName + ".svf"));
             break;
             // potential errors are handled by
@@ -93,16 +96,28 @@ std::shared_ptr<Problem> ProblemManager::readProblemFromDisk(const std::string& 
     }
 }
 
+std::vector<double> ProblemManager::getProblemSolution(
+  const Antares::Solver::WeeklyProblemId& pbId) const
+{
+    const auto& solution = solutions_.find(pbId);
+    if (solution != solutions_.end())
+    {
+        return solution->second;
+    }
+    throw std::runtime_error("No solution was found in memory for problem "
+                             + getPbNameFromId(pbId));
+}
+
 void ProblemManager::saveProblemToFile(const Antares::Solver::WeeklyProblemId& pbId,
                                        std::shared_ptr<Problem> problem,
                                        std::filesystem::path& folder) const
 {
     switch (problemFormat_)
     {
-    case ProblemsFormat::MPS_FILE:
+    case ProblemFormat::MPS_FILE:
         problem->write_prob_mps(folder / (getPbNameFromId(pbId) + ".mps"));
         break;
-    case ProblemsFormat::OPTIMIZED:
+    case ProblemFormat::OPTIMIZED:
         problem->save_prob(folder / (getPbNameFromId(pbId) + ".svf"));
         break;
         // potential errors are handled by

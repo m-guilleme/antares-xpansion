@@ -3,16 +3,15 @@
 #include <iostream>
 #include <ranges>
 
-#include "antares-xpansion/bellman_values/BellmanValuesExeOptions.h"
 #include "antares-xpansion/bellman_values/DynamicProgrammingConfigReader.h"
 #include "antares-xpansion/bellman_values/ProblemManager.h"
 #include "antares-xpansion/bellman_values/SettingsConfigReader.h"
 #include "antares-xpansion/benders/factories/LoggerFactories.h"
 #include "antares-xpansion/benders/logger/FilteredLogger.h"
+#include "antares-xpansion/config_reader/ProblemGenerationConfigOptions.h"
 #include "antares-xpansion/evaluator/GridEvaluator.h"
+#include "antares-xpansion/exe_options/CommonExeOptions.h"
 #include "antares-xpansion/lpnamer/main/ProblemGenerationForWaterValueCalculation.h"
-#include "antares-xpansion/lpnamer/problem_modifier/XpansionProblemsFromAntaresProvider.h"
-#include "malloc.h"
 
 std::string formatTime(const std::chrono::system_clock::time_point& timePoint)
 {
@@ -106,17 +105,17 @@ int main(int argc, char** argv)
 {
     try
     {
-        auto optionsParser = BellmanValuesExeOptions();
+        auto optionsParser = CommonExeOptions();
         optionsParser.Parse(argc, argv);
         auto studyPath = optionsParser.StudyPath();
         int nbThreads = optionsParser.NbThreads();
 
         const std::filesystem::path bellmanConfigFilePath(
-          studyPath / "user/water_values/dynamic_programming.yaml");
+          studyPath / "user/water_values/dynamic_programming.yml");
         const std::filesystem::path settingsConfigFilePath(studyPath
-                                                           / "user/water_values/settings.yaml");
+                                                           / "user/water_values/settings.yml");
 
-        // DynamicProgrammingConfigReader will check whether the dynamic_programming.yaml file
+        // DynamicProgrammingConfigReader will check whether the dynamic_programming.yml file
         // exists and return default values if needed
         DynamicProgrammingConfigReader dpcr(bellmanConfigFilePath);
         int startWeek = dpcr.getStartWeek();
@@ -125,19 +124,19 @@ int main(int argc, char** argv)
         bool antaresFormat = dpcr.getAntaresFormat();
         bool useOptimalTrajectory = dpcr.getUseOptimalTrajectory();
 
-        // SettingsConfigReader will check whether the settings.yaml file exists and
+        // SettingsConfigReader will check whether the settings.yml file exists and
         // return default values if needed
-        SettingsConfigReader scr(settingsConfigFilePath);
+        bellman_values::SettingsConfigReader scr(settingsConfigFilePath);
         std::string solverName = scr.getSolver();
         bool writePbFiles = scr.getKeepMps();
         const std::string problemFormat = scr.getProblemFormat();
         const std::string verbosity = scr.getVerbosity();
         const bool cacheProblems = scr.getCacheProblems();
 
-        ConfigurationManager::ConfigDirectories directories{
-          .study_dir = studyPath,
-          .simulation_dir = ConfigurationManager::generateOutputName(studyPath),
-        };
+        ProblemGenerationConfigOptions configOptions(std::filesystem::absolute(studyPath),
+                                                     ProblemFormat::OPTIMIZED);
+        const ConfigurationManager configManager(configOptions);
+        const ConfigurationManager::ConfigDirectories directories = configManager.Directories();
 
         // at this point, the simulation folder is already needed for logs (normally created when
         // updating problems)
@@ -157,7 +156,8 @@ int main(int argc, char** argv)
                                                                  / "user/water_values/grid.csv",
                                                                logger);
 
-        auto problemManager = std::make_shared<ProblemManager>(solverName,
+        auto problemManager = std::make_shared<ProblemManager>(logger,
+                                                               solverName,
                                                                problemFormat,
                                                                writePbFiles,
                                                                cacheProblems,

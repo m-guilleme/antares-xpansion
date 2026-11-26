@@ -5,17 +5,30 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <ranges>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "antares-xpansion/evaluator/Interpolator.h"
 
+namespace
+{
+std::string toLower(std::string_view text)
+{
+    std::string lower(text);
+    std::ranges::transform(lower,
+                           lower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lower;
+}
+} // namespace
+
 /// @brief Load a reservoir from path of the study and the name of the area
 /// @param path_to_input path of the study
 /// @param areaName name of the area
 Reservoir::Reservoir(const std::filesystem::path& path_to_input, const std::string& areaName):
-    area(areaName),
+    area(toLower(areaName)),
     capacity(0.0),
     efficiency(0.0)
 {
@@ -151,7 +164,7 @@ void Reservoir::loadHydroIni(const std::filesystem::path& ini_path)
     }
     if (!found_efficiency)
     {
-        throw std::runtime_error("Missing efficiency for area: " + area);
+        efficiency = 1;
     }
     // computing water values requires that the area uses heuristic and not water
     // but only if said sections exist
@@ -179,7 +192,7 @@ void Reservoir::loadRuleCurves(const std::filesystem::path& dir_study)
     std::ifstream file(path);
     if (!file)
     {
-        throw std::runtime_error("Could not open rule curve file loacated at : " + path.string());
+        throw std::runtime_error("Could not open rule curve file located at : " + path.string());
     }
 
     std::vector<std::vector<double>> rule_curves;
@@ -346,7 +359,7 @@ ReservoirManagement::ReservoirManagement(Reservoir& reservoir,
     penalty_upper_rule_curve(penalty_upper_rule_curve),
     penalty_final_level(penalty_final_level),
     force_final_level(force_final_level),
-    final_level(final_level.value_or(reservoir.initial_level)),
+    final_level(final_level ? *final_level * reservoir.capacity : reservoir.initial_level),
     cvar(cvar)
 {
 }

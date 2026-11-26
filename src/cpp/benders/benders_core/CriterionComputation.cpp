@@ -34,15 +34,41 @@ void CriterionComputation::ComputeCriterion(double subproblem_weight,
     }
 }
 
+void CriterionComputation::ComputeCriterionFromProblem(std::shared_ptr<SolverAbstract> problem,
+                                                       double subproblem_weight,
+                                                       std::vector<double>& criteria,
+                                                       std::vector<double>& patterns_values)
+{
+    if (var_indices_.empty())
+    {
+        SearchVariables(problem->get_col_names());
+    }
+    std::vector<double> sub_problem_solution(problem->get_ncols());
+    problem->get_lp_sol(sub_problem_solution.data(), nullptr, nullptr);
+    ComputeCriterion(subproblem_weight, sub_problem_solution, criteria, patterns_values);
+}
+
 void CriterionComputation::SearchVariables(const std::vector<std::string>& variables)
 {
     Benders::Criterion::VariablesGroup variablesGroup(variables, criterion_input_data_.Criteria());
     var_indices_ = variablesGroup.Indices();
 }
 
+void CriterionComputation::SearchConstraints(const std::vector<std::string>& constraints)
+{
+    Benders::Criterion::ConstraintsGroup constraintsGroup(constraints,
+                                                          criterion_input_data_.Criteria());
+    var_indices_ = constraintsGroup.Indices();
+}
+
 const CriterionInputData& CriterionComputation::getCriterionInputData() const
 {
     return criterion_input_data_;
+}
+
+void CriterionComputation::SetCriterionCountThreshold(double count_threshold)
+{
+    criterion_input_data_.SetCriterionCountThreshold(count_threshold);
 }
 
 std::vector<std::vector<int>>& CriterionComputation::getVarIndices()

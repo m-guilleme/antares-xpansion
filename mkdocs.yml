@@ -64,6 +64,8 @@ nav:
       - Multiple problem generation: reference/trajectory-investment/multiple-problem-generation.md
       - Merged weights file generation : reference/trajectory-investment/merge-weights.md
       - Merging annual problems: reference/trajectory-investment/merge-master.md
+    - Water values computation: user-guide/get-started/water-values-computation.md
+    - Balancing computation: user-guide/get-started/balancing-computation.md
   - Developer guide:
     - developer-guide/index.md
     - Install from source:

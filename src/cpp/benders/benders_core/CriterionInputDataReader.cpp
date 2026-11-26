@@ -10,9 +10,9 @@ using namespace Benders::Criterion;
  * prefix could be := UnsuppliedEnergy:: or something else necessarily
  * /!\ body could be := area name or equivalent or nothing
  */
-CriterionPattern::CriterionPattern(std::string prefix, std::string body):
-    prefix_(std::move(prefix)),
-    body_(std::move(body))
+CriterionPattern::CriterionPattern(std::string_view prefix, std::string_view body):
+    prefix_(prefix),
+    body_(body)
 {
 }
 
@@ -21,28 +21,28 @@ std::string CriterionPattern::Value() const
     return prefix_ + "area<" + body_ + ">";
 }
 
-const std::string& CriterionPattern::GetPrefix() const
+std::string_view CriterionPattern::GetPrefix() const
 {
     return prefix_;
 }
 
-void CriterionPattern::SetPrefix(const std::string& prefix)
+void CriterionPattern::SetPrefix(std::string_view prefix)
 {
     prefix_ = prefix;
 }
 
-const std::string& CriterionPattern::GetBody() const
+std::string_view CriterionPattern::GetBody() const
 {
     return body_;
 }
 
-void CriterionPattern::SetBody(const std::string& body)
+void CriterionPattern::SetBody(std::string_view body)
 {
     body_ = body;
 }
 
-CriterionSingleInputData::CriterionSingleInputData(const std::string& prefix,
-                                                   const std::string& body,
+CriterionSingleInputData::CriterionSingleInputData(std::string_view prefix,
+                                                   std::string_view body,
                                                    double criterion):
     pattern_(prefix, body),
     criterion_(criterion)
@@ -64,7 +64,7 @@ void CriterionSingleInputData::SetCriterion(double criterion)
     criterion_ = criterion;
 }
 
-void CriterionSingleInputData::ResetPattern(const std::string& prefix, const std::string& body)
+void CriterionSingleInputData::ResetPattern(std::string_view prefix, std::string_view body)
 {
     pattern_.SetPrefix(prefix);
     pattern_.SetBody(body);
@@ -85,7 +85,7 @@ std::vector<std::string> CriterionInputData::PatternBodies() const
     std::vector<std::string> ret;
     for (const auto& data: criterion_vector_)
     {
-        ret.push_back(data.Pattern().GetBody());
+        ret.push_back(std::string(data.Pattern().GetBody()));
     }
     return ret;
 }
@@ -177,7 +177,7 @@ public:
         }
 
         rhs.SetCriterion(criterion.as<double>());
-        rhs.ResetPattern(UnsuppliedEnergy, body.as<std::string>());
+        rhs.ResetPattern(getPrefix(Type::UnsuppliedEnergy), body.as<std::string>());
         return true;
     }
 };
