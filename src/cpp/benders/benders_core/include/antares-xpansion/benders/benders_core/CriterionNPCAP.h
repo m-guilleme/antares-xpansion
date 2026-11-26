@@ -13,10 +13,10 @@ public:
     explicit CriterionNPCAP(const CriterionInputData& criterion_input_data,
                             std::shared_ptr<SolverAbstract> problem);
 
-    void ComputeCriterion(std::shared_ptr<SolverAbstract> problem,
-                          double subproblem_weight,
-                          std::vector<double>& criteria,
-                          std::vector<double>& patterns_values) override;
+    void ComputeCriterionFromProblem(std::shared_ptr<SolverAbstract> problem,
+                                     double subproblem_weight,
+                                     std::vector<double>& criteria,
+                                     std::vector<double>& patterns_values) override;
 
     ~CriterionNPCAP() override = default;
 

@@ -139,7 +139,10 @@ void GreedyBalancingFinder::ProcessSubproblem(const Antares::Solver::WeeklyProbl
     totalPbModifTimer += timer.elapsed();
     SubProblemData res = SolveSubproblem(subProblem);
 
-    criterion_computation_->ComputeCriterion(subProblem, 1, res.criteria, res.patterns_values);
+    criterion_computation_->ComputeCriterionFromProblem(subProblem,
+                                                        1,
+                                                        res.criteria,
+                                                        res.patterns_values);
 
     std::vector<double> dualValuesCst(subProblem->get_nrows());
     subProblem->get_lp_sol(NULL, dualValuesCst.data(), NULL);

@@ -58,6 +58,27 @@ public:
      * based on the provided subproblem weight and solution. It updates the
      * criteria and patterns values vectors accordingly.
      *
+     * @param subproblem_weight The weight of the subproblem affecting the
+     * criteria.
+     * @param sub_problem_solution A vector containing the solution values of
+     * the subproblem.
+     * @param criteria A reference to a vector where the computed
+     * criteria will be stored.
+     * @param patterns_values A reference to a vector where the computed
+     * pattern values will be stored.
+     */
+    void ComputeCriterion(double subproblem_weight,
+                          const std::vector<double>& sub_problem_solution,
+                          std::vector<double>& criteria,
+                          std::vector<double>& patterns_values);
+
+    /**
+     * @brief Computes the criteria directly from an already solved problem.
+     *
+     * Default behaviour: retrieves the primal solution of the problem and
+     * calls ComputeCriterion. Criterion-specific classes (LOLE, UNSPENERG,
+     * NPCAP) override it.
+     *
      * @param problem The already solved problem
      * @param subproblem_weight The weight of the subproblem affecting the
      * criteria.
@@ -66,11 +87,10 @@ public:
      * @param patterns_values A reference to a vector where the computed
      * pattern values will be stored.
      */
-    virtual void ComputeCriterion(std::shared_ptr<SolverAbstract> problem,
-                                  double subproblem_weight,
-                                  std::vector<double>& criteria,
-                                  std::vector<double>& patterns_values)
-      = 0;
+    virtual void ComputeCriterionFromProblem(std::shared_ptr<SolverAbstract> problem,
+                                             double subproblem_weight,
+                                             std::vector<double>& criteria,
+                                             std::vector<double>& patterns_values);
 
     /**
      * @brief Retrieves the variable indices.
@@ -80,7 +100,7 @@ public:
      *
      * @return A reference to the vector of variable indices.
      */
-    std::vector<std::vector<int>>& getIndices();
+    std::vector<std::vector<int>>& getVarIndices();
 
     /**
      * @brief Retrieves the criterion input data.
@@ -102,7 +122,7 @@ public:
     virtual ~CriterionComputation() = default;
 
 protected:
-    std::vector<std::vector<int>> indices_ = {};
+    std::vector<std::vector<int>> var_indices_ = {};
     CriterionInputData criterion_input_data_;
 };
 } // namespace Benders::Criterion

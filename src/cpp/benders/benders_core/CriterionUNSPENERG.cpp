@@ -15,13 +15,13 @@ CriterionUNSPENERG::CriterionUNSPENERG(const CriterionInputData& criterion_input
     SearchVariables(col_names);
 }
 
-void CriterionUNSPENERG::ComputeCriterion(std::shared_ptr<SolverAbstract> problem,
-                                          double subproblem_weight,
-                                          std::vector<double>& criteria,
-                                          std::vector<double>& patterns_values)
+void CriterionUNSPENERG::ComputeCriterionFromProblem(std::shared_ptr<SolverAbstract> problem,
+                                                     double subproblem_weight,
+                                                     std::vector<double>& criteria,
+                                                     std::vector<double>& patterns_values)
 {
     // this check still exists in case a problem hasn't been passed to the constructor
-    if (indices_.empty())
+    if (var_indices_.empty())
     {
         const auto col_names = problem->get_col_names();
         SearchVariables(col_names);
@@ -30,15 +30,13 @@ void CriterionUNSPENERG::ComputeCriterion(std::shared_ptr<SolverAbstract> proble
     std::vector<double> varValues(problem->get_ncols());
     problem->get_lp_sol(varValues.data(), NULL, NULL);
 
-    auto criteria_input_size = static_cast<int>(indices_.size()); // num of patterns
+    auto criteria_input_size = static_cast<int>(var_indices_.size()); // num of patterns
     criteria.resize(criteria_input_size, 0.);
     patterns_values.resize(criteria_input_size, 0.);
 
-    double criterion_count_threshold = criterion_input_data_.CriterionCountThreshold();
-
     for (int pattern_index(0); pattern_index < criteria_input_size; ++pattern_index)
     {
-        auto pattern_indices = indices_[pattern_index];
+        auto pattern_indices = var_indices_[pattern_index];
         double pattern_value = patterns_values[pattern_index];
         double criteria_value = criteria[pattern_index];
         for (auto index: pattern_indices)

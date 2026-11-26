@@ -6,6 +6,7 @@
 
 namespace Benders::Criterion
 {
+
 CriterionNPCAP::CriterionNPCAP(const CriterionInputData& criterion_input_data,
                                std::shared_ptr<SolverAbstract> problem):
     CriterionComputation(criterion_input_data)
@@ -32,12 +33,12 @@ CriterionNPCAP::CriterionNPCAP(const CriterionInputData& criterion_input_data,
     }
 }
 
-void CriterionNPCAP::ComputeCriterion(std::shared_ptr<SolverAbstract> problem,
-                                      double subproblem_weight,
-                                      std::vector<double>& criteria,
-                                      std::vector<double>& patterns_values)
+void CriterionNPCAP::ComputeCriterionFromProblem(std::shared_ptr<SolverAbstract> problem,
+                                                 double subproblem_weight,
+                                                 std::vector<double>& criteria,
+                                                 std::vector<double>& patterns_values)
 {
-    auto criteria_input_size = static_cast<int>(indices_.size()); // num of patterns
+    auto criteria_input_size = static_cast<int>(var_indices_.size()); // num of patterns
     criteria.resize(criteria_input_size, 0.);
     patterns_values.resize(criteria_input_size, 0.);
 
@@ -46,7 +47,7 @@ void CriterionNPCAP::ComputeCriterion(std::shared_ptr<SolverAbstract> problem,
 
     for (int pattern_index(0); pattern_index < criteria_input_size; ++pattern_index)
     {
-        auto pattern_indices = indices_[pattern_index];
+        auto pattern_indices = var_indices_[pattern_index];
         double pattern_value = patterns_values[pattern_index];
         double criteria_value = criteria[pattern_index];
         for (auto index: pattern_indices)
